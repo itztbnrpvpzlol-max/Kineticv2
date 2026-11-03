@@ -36,13 +36,13 @@ class AppSettings(context: Context) {
     var loop by mutableStateOf(prefs.getBoolean("loop", false))
         private set
 
-    fun setResolution(i: Int) { resolution = i; prefs.edit().putInt("resolution", i).apply() }
-    fun setFrameRate(i: Int) { frameRate = i; prefs.edit().putInt("frameRate", i).apply() }
-    fun setCompLength(i: Int) { compLength = i; prefs.edit().putInt("compLength", i).apply() }
-    fun setTimeFormat(i: Int) { timeFormat = i; prefs.edit().putInt("timeFormat", i).apply() }
-    fun setSensitivity(i: Int) { sensitivity = i; prefs.edit().putInt("sensitivity", i).apply() }
-    fun setSnap(v: Boolean) { snap = v; prefs.edit().putBoolean("snap", v).apply() }
-    fun setLoop(v: Boolean) { loop = v; prefs.edit().putBoolean("loop", v).apply() }
+    fun putResolution(i: Int) { resolution = i; prefs.edit().putInt("resolution", i).apply() }
+    fun putFrameRate(i: Int) { frameRate = i; prefs.edit().putInt("frameRate", i).apply() }
+    fun putCompLength(i: Int) { compLength = i; prefs.edit().putInt("compLength", i).apply() }
+    fun putTimeFormat(i: Int) { timeFormat = i; prefs.edit().putInt("timeFormat", i).apply() }
+    fun putSensitivity(i: Int) { sensitivity = i; prefs.edit().putInt("sensitivity", i).apply() }
+    fun putSnap(v: Boolean) { snap = v; prefs.edit().putBoolean("snap", v).apply() }
+    fun putLoop(v: Boolean) { loop = v; prefs.edit().putBoolean("loop", v).apply() }
 
     val fps: Int get() = FPS[frameRate]
     val compSeconds: Int get() = COMP_LENGTHS[compLength]

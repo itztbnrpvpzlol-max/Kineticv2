@@ -40,17 +40,17 @@ fun SettingsScreen(settings: AppSettings, onBack: () -> Unit) {
         Box(Modifier.fillMaxWidth().height(1.dp).background(KColors.Line))
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp)) {
             Section("New compositions")
-            ChoiceRow("Resolution", AppSettings.RESOLUTIONS, settings.resolution) { settings.setResolution(it) }
-            ChoiceRow("Frame rate", AppSettings.FPS.map { "$it fps" }, settings.frameRate) { settings.setFrameRate(it) }
-            ChoiceRow("Length", AppSettings.COMP_LENGTHS.map { "${it}s" }, settings.compLength) { settings.setCompLength(it) }
+            ChoiceRow("Resolution", AppSettings.RESOLUTIONS, settings.resolution) { settings.putResolution(it) }
+            ChoiceRow("Frame rate", AppSettings.FPS.map { "$it fps" }, settings.frameRate) { settings.putFrameRate(it) }
+            ChoiceRow("Length", AppSettings.COMP_LENGTHS.map { "${it}s" }, settings.compLength) { settings.putCompLength(it) }
 
             Section("Timeline")
-            ChoiceRow("Time display", AppSettings.TIME_FORMATS, settings.timeFormat) { settings.setTimeFormat(it) }
-            SwitchRow("Snap playhead to keyframes", settings.snap) { settings.setSnap(it) }
-            SwitchRow("Loop playback", settings.loop) { settings.setLoop(it) }
+            ChoiceRow("Time display", AppSettings.TIME_FORMATS, settings.timeFormat) { settings.putTimeFormat(it) }
+            SwitchRow("Snap playhead to keyframes", settings.snap) { settings.putSnap(it) }
+            SwitchRow("Loop playback", settings.loop) { settings.putLoop(it) }
 
             Section("Properties")
-            ChoiceRow("Scrub sensitivity", AppSettings.SENSITIVITY, settings.sensitivity) { settings.setSensitivity(it) }
+            ChoiceRow("Scrub sensitivity", AppSettings.SENSITIVITY, settings.sensitivity) { settings.putSensitivity(it) }
 
             Spacer(Modifier.height(24.dp))
             Text("Kinetic 0.2", color = KColors.Dim, fontSize = 12.sp)
