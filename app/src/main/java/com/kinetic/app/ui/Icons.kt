@@ -31,9 +31,10 @@ fun KIcon(kind: IconKind, tint: Color, modifier: Modifier = Modifier.size(22.dp)
         val sw = w * 0.09f
         val st = Stroke(width = sw, cap = StrokeCap.Round, join = StrokeJoin.Round)
         fun pt(x: Float, y: Float) = Offset(w * x, h * y)
-        fun poly(closed: Boolean, vararg pts: Offset): Path = Path().apply {
-            moveTo(pts[0].x, pts[0].y)
-            for (i in 1 until pts.size) lineTo(pts[i].x, pts[i].y)
+        fun pr(x: Float, y: Float) = Pair(x, y)
+        fun poly(closed: Boolean, vararg pts: Pair<Float, Float>): Path = Path().apply {
+            moveTo(w * pts[0].first, h * pts[0].second)
+            for (i in 1 until pts.size) lineTo(w * pts[i].first, h * pts[i].second)
             if (closed) close()
         }
         fun line(a: Offset, b: Offset) = drawLine(tint, a, b, strokeWidth = sw, cap = StrokeCap.Round)
@@ -53,7 +54,7 @@ fun KIcon(kind: IconKind, tint: Color, modifier: Modifier = Modifier.size(22.dp)
             IconKind.HANDLE -> {
                 line(pt(.18f, .3f), pt(.82f, .3f)); line(pt(.18f, .5f), pt(.82f, .5f)); line(pt(.18f, .7f), pt(.82f, .7f))
             }
-            IconKind.PLAY -> drawPath(poly(true, pt(.3f, .15f), pt(.85f, .5f), pt(.3f, .85f)), tint)
+            IconKind.PLAY -> drawPath(poly(true, pr(.3f, .15f), pr(.85f, .5f), pr(.3f, .85f)), tint)
             IconKind.PAUSE -> {
                 drawRect(tint, pt(.22f, .15f), Size(w * .2f, h * .7f))
                 drawRect(tint, pt(.58f, .15f), Size(w * .2f, h * .7f))
@@ -66,11 +67,11 @@ fun KIcon(kind: IconKind, tint: Color, modifier: Modifier = Modifier.size(22.dp)
                         cubicTo(w * .92f, h * .45f, w * .6f, h * .32f, w * .28f, h * .42f)
                     }
                     drawPath(p, tint, style = st)
-                    drawPath(poly(false, pt(.4f, .22f), pt(.22f, .43f), pt(.44f, .6f)), tint, style = st)
+                    drawPath(poly(false, pr(.4f, .22f), pr(.22f, .43f), pr(.44f, .6f)), tint, style = st)
                 }
             }
             IconKind.DIAMOND, IconKind.DIAMOND_FILLED -> {
-                val d = poly(true, pt(.5f, .12f), pt(.88f, .5f), pt(.5f, .88f), pt(.12f, .5f))
+                val d = poly(true, pr(.5f, .12f), pr(.88f, .5f), pr(.5f, .88f), pr(.12f, .5f))
                 if (kind == IconKind.DIAMOND_FILLED) drawPath(d, tint) else drawPath(d, tint, style = st)
             }
             IconKind.STOPWATCH -> {
@@ -79,7 +80,7 @@ fun KIcon(kind: IconKind, tint: Color, modifier: Modifier = Modifier.size(22.dp)
                 line(pt(.38f, .1f), pt(.62f, .1f)); line(pt(.5f, .1f), pt(.5f, .24f))
             }
             IconKind.SELECT -> drawPath(
-                poly(true, pt(.28f, .12f), pt(.28f, .78f), pt(.44f, .62f), pt(.56f, .9f), pt(.67f, .84f), pt(.55f, .58f), pt(.78f, .58f)),
+                poly(true, pr(.28f, .12f), pr(.28f, .78f), pr(.44f, .62f), pr(.56f, .9f), pr(.67f, .84f), pr(.55f, .58f), pr(.78f, .58f)),
                 tint, style = st
             )
             IconKind.SHAPES -> {
@@ -99,23 +100,23 @@ fun KIcon(kind: IconKind, tint: Color, modifier: Modifier = Modifier.size(22.dp)
                 drawPath(star, tint, style = st)
             }
             IconKind.LAYERS -> {
-                drawPath(poly(true, pt(.1f, .38f), pt(.5f, .18f), pt(.9f, .38f), pt(.5f, .58f)), tint, style = st)
-                drawPath(poly(false, pt(.1f, .54f), pt(.5f, .74f), pt(.9f, .54f)), tint, style = st)
-                drawPath(poly(false, pt(.1f, .7f), pt(.5f, .9f), pt(.9f, .7f)), tint, style = st)
+                drawPath(poly(true, pr(.1f, .38f), pr(.5f, .18f), pr(.9f, .38f), pr(.5f, .58f)), tint, style = st)
+                drawPath(poly(false, pr(.1f, .54f), pr(.5f, .74f), pr(.9f, .54f)), tint, style = st)
+                drawPath(poly(false, pr(.1f, .7f), pr(.5f, .9f), pr(.9f, .7f)), tint, style = st)
             }
             IconKind.SLIDERS -> {
                 line(pt(.12f, .25f), pt(.88f, .25f)); line(pt(.12f, .5f), pt(.88f, .5f)); line(pt(.12f, .75f), pt(.88f, .75f))
                 drawCircle(tint, w * .09f, pt(.35f, .25f)); drawCircle(tint, w * .09f, pt(.65f, .5f)); drawCircle(tint, w * .09f, pt(.45f, .75f))
             }
-            IconKind.PREV -> drawPath(poly(false, pt(.65f, .2f), pt(.3f, .5f), pt(.65f, .8f)), tint, style = st)
-            IconKind.NEXT -> drawPath(poly(false, pt(.35f, .2f), pt(.7f, .5f), pt(.35f, .8f)), tint, style = st)
-            IconKind.CHEVRON_DOWN -> drawPath(poly(false, pt(.25f, .38f), pt(.5f, .64f), pt(.75f, .38f)), tint, style = st)
-            IconKind.CHEVRON_UP -> drawPath(poly(false, pt(.25f, .62f), pt(.5f, .36f), pt(.75f, .62f)), tint, style = st)
+            IconKind.PREV -> drawPath(poly(false, pr(.65f, .2f), pr(.3f, .5f), pr(.65f, .8f)), tint, style = st)
+            IconKind.NEXT -> drawPath(poly(false, pr(.35f, .2f), pr(.7f, .5f), pr(.35f, .8f)), tint, style = st)
+            IconKind.CHEVRON_DOWN -> drawPath(poly(false, pr(.25f, .38f), pr(.5f, .64f), pr(.75f, .38f)), tint, style = st)
+            IconKind.CHEVRON_UP -> drawPath(poly(false, pr(.25f, .62f), pr(.5f, .36f), pr(.75f, .62f)), tint, style = st)
             IconKind.PLUS -> { line(pt(.5f, .2f), pt(.5f, .8f)); line(pt(.2f, .5f), pt(.8f, .5f)) }
             IconKind.IMAGE -> {
                 drawRoundRect(tint, pt(.12f, .16f), Size(w * .76f, h * .68f), CornerRadius(w * .08f), style = st)
                 drawCircle(tint, w * .07f, pt(.34f, .36f))
-                drawPath(poly(false, pt(.16f, .78f), pt(.42f, .52f), pt(.6f, .68f), pt(.72f, .56f), pt(.86f, .72f)), tint, style = st)
+                drawPath(poly(false, pr(.16f, .78f), pr(.42f, .52f), pr(.6f, .68f), pr(.72f, .56f), pr(.86f, .72f)), tint, style = st)
             }
             IconKind.MUSIC -> {
                 drawCircle(tint, w * .12f, pt(.32f, .76f))
@@ -123,7 +124,7 @@ fun KIcon(kind: IconKind, tint: Color, modifier: Modifier = Modifier.size(22.dp)
             }
             IconKind.VIDEO -> {
                 drawRoundRect(tint, pt(.1f, .18f), Size(w * .8f, h * .64f), CornerRadius(w * .08f), style = st)
-                drawPath(poly(true, pt(.42f, .36f), pt(.62f, .5f), pt(.42f, .64f)), tint)
+                drawPath(poly(true, pr(.42f, .36f), pr(.62f, .5f), pr(.42f, .64f)), tint)
             }
             IconKind.NULL -> {
                 drawRect(tint, pt(.18f, .18f), Size(w * .64f, h * .64f), style = st)
