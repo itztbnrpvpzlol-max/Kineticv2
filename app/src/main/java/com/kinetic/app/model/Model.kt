@@ -108,6 +108,7 @@ data class Layer(
     val height: Float,
     val visible: Boolean = true,
     val parentId: String? = null,
+    val scaleLinked: Boolean = false,
     val text: String = "Text",
     val color: Int = 0xFF8D8BA3.toInt(),
     val props: Map<PropId, Prop>,

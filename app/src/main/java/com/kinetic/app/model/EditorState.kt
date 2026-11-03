@@ -165,6 +165,8 @@ class EditorState(val settings: AppSettings) {
 
     fun toggleVisible(id: String) = updateLayer(id) { it.copy(visible = !it.visible) }
 
+    fun toggleScaleLink(id: String) = updateLayer(id) { it.copy(scaleLinked = !it.scaleLinked) }
+
     fun renameLayer(id: String, name: String) = updateLayer(id) { it.copy(name = name) }
 
     fun setText(id: String, text: String) = updateLayer(id) { it.copy(text = text, name = text.ifBlank { "Text" }) }
@@ -234,7 +236,12 @@ class EditorState(val settings: AppSettings) {
         val t = time
         val eps = frame / 2f
         updateLayer(layerId, push = false) { l ->
-            l.copy(props = l.props + (id to l.p(id).withValueAt(t, v, eps)))
+            var next = l.props + (id to l.p(id).withValueAt(t, v, eps))
+            if (l.scaleLinked && (id == PropId.SCALE_X || id == PropId.SCALE_Y)) {
+                val other = if (id == PropId.SCALE_X) PropId.SCALE_Y else PropId.SCALE_X
+                next = next + (other to l.p(other).withValueAt(t, v, eps))
+            }
+            l.copy(props = next)
         }
     }
 

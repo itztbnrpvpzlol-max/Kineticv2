@@ -50,6 +50,14 @@ fun PropertiesList(editor: EditorState, layer: Layer, onParent: () -> Unit) {
                 color = KColors.Accent, fontSize = 13.sp, maxLines = 1
             )
         }
+        if (layer.type != LayerType.AUDIO) {
+            Row(Modifier.fillMaxWidth().height(38.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Link Scale X / Y", color = KColors.Text, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                Box(Modifier.clip(RoundedCornerShape(8.dp)).background(if (layer.scaleLinked) KColors.Accent.copy(alpha = 0.22f) else KColors.Surface2).clickable { editor.toggleScaleLink(layer.id) }.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                    Text(if (layer.scaleLinked) "LINKED" else "UNLINKED", color = if (layer.scaleLinked) KColors.Accent else KColors.Muted, fontSize = 10.sp)
+                }
+            }
+        }
         if (layer.type == LayerType.AUDIO) {
             Text(
                 "Audio layers have no transform properties yet.",

@@ -73,9 +73,10 @@ import com.kinetic.app.model.LayerType
 import com.kinetic.app.model.PropId
 import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.roundToInt
 import kotlin.random.Random
 
-private val LEFT_W = 76.dp
+private val LEFT_W = 108.dp
 private val ROW_H = 40.dp
 
 fun clipColor(t: LayerType): Color = when (t) {
@@ -209,6 +210,8 @@ private fun LayerRow(editor: EditorState, layer: Layer, pps: Float, hScroll: Scr
     val selected = editor.selectedId == layer.id
     val dens = LocalDensity.current.density
     var acc by remember { mutableFloatStateOf(0f) }
+    var parentDrag by remember { mutableFloatStateOf(0f) }
+    var isParentDragging by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth()) {
         Row(
             Modifier
@@ -239,6 +242,32 @@ private fun LayerRow(editor: EditorState, layer: Layer, pps: Float, hScroll: Scr
                     },
                     contentAlignment = Alignment.Center
                 ) { KIcon(IconKind.HANDLE, KColors.Dim) }
+                Box(
+                    Modifier.size(36.dp).pointerInput(layer.id, editor.layers) {
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = { parentDrag = 0f; isParentDragging = true },
+                            onDragEnd = {
+                                val from = editor.layers.indexOfFirst { it.id == layer.id }
+                                val step = 40f * dens
+                                val targetIndex = (from + (parentDrag / step).roundToInt()).coerceIn(editor.layers.indices)
+                                val target = editor.layers.getOrNull(targetIndex)
+                                if (target != null && target.id != layer.id && target.type == LayerType.NULL) {
+                                    editor.setParent(layer.id, target.id)
+                                }
+                                isParentDragging = false; parentDrag = 0f
+                            },
+                            onDragCancel = { isParentDragging = false; parentDrag = 0f }
+                        ) { change, drag -> change.consume(); parentDrag += drag.y }
+                    },
+                    contentAlignment = Alignment.Center
+                ) {
+                    KIcon(IconKind.PARENT, if (layer.parentId != null) KColors.Accent else KColors.Dim)
+                    if (isParentDragging) Canvas(Modifier.fillMaxSize()) {
+                        val x = size.width / 2f
+                        drawLine(KColors.Accent, Offset(x, size.height / 2f), Offset(x, size.height / 2f + parentDrag), 2.dp.toPx())
+                        drawCircle(KColors.Accent, 4.dp.toPx(), Offset(x, size.height / 2f + parentDrag))
+                    }
+                }
             }
             Box(Modifier.weight(1f).fillMaxHeight().horizontalScroll(hScroll)) {
                 Box(Modifier.width(contentW).fillMaxHeight()) { Clip(editor, layer, pps, selected) }

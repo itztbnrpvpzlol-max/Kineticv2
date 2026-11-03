@@ -34,6 +34,9 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -67,6 +70,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -76,7 +80,8 @@ fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> 
     var showParent by remember { mutableStateOf(false) }
     var showRename by remember { mutableStateOf(false) }
     var tab by remember { mutableIntStateOf(0) }
-    var panelOpen by remember { mutableStateOf(true) }
+    var showProperties by remember { mutableStateOf(false) }
+    val propertySheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     fun leave() { if (editor.layers.isEmpty()) onExit() else showLeave = true }
     BackHandler { leave() }
@@ -108,7 +113,7 @@ fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> 
                 val info = withContext(Dispatchers.IO) { MediaLoader.probe(ctx, u, type) }
                 val name = MediaLoader.displayName(ctx, u)
                 editor.addMedia(type, name, u.toString(), info.width, info.height, info.length)
-                panelOpen = true
+                showProperties = true
             }
         }
     }
@@ -128,32 +133,41 @@ fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> 
         TimelinePane(editor, Modifier.weight(1f))
 
         if (selected != null) {
-            if (panelOpen) {
-                EditPanel(
-                    editor, selected, tab, { tab = it }, { panelOpen = false },
-                    onRename = { showRename = true }, onParent = { showParent = true }
-                )
-            } else {
-                Row(
-                    Modifier.fillMaxWidth().height(34.dp).background(KColors.Surface).clickable { panelOpen = true }
-                        .padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Properties & graph", color = KColors.Muted, fontSize = 12.sp, modifier = Modifier.weight(1f))
-                    KIcon(IconKind.CHEVRON_UP, KColors.Muted, Modifier.size(18.dp))
-                }
+            Row(
+                Modifier.fillMaxWidth().height(36.dp).background(KColors.Surface)
+                    .clickable { showProperties = true }.padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(selected.name, color = KColors.Text, fontSize = 12.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("EDIT  ·  PROPERTIES & GRAPH", color = KColors.Accent, fontSize = 10.sp)
+                KIcon(IconKind.CHEVRON_UP, KColors.Muted, Modifier.padding(start = 8.dp).size(18.dp))
             }
         }
 
         BottomToolbar(
             onSelect = { editor.select(null) },
-            onText = { editor.addText(); panelOpen = true },
-            onShapes = { editor.addShape(); panelOpen = true },
+            onText = { editor.addText(); showProperties = true },
+            onShapes = { editor.addShape(); showProperties = true },
             onEffects = { Toast.makeText(ctx, "Effects aren't added yet", Toast.LENGTH_SHORT).show() },
             onLayers = { showLayers = true },
-            onAdjust = { editor.addAdjustment(); panelOpen = true },
+            onAdjust = { editor.addAdjustment(); showProperties = true },
             onAdd = { showImport = true }
         )
+    }
+
+    if (showProperties && selected != null) {
+        ModalBottomSheet(
+            onDismissRequest = { showProperties = false },
+            sheetState = propertySheetState,
+            containerColor = KColors.Surface,
+            dragHandle = { Box(Modifier.padding(vertical = 8.dp).size(width = 42.dp, height = 4.dp).clip(CircleShape).background(KColors.Muted)) }
+        ) {
+            EditPanel(
+                editor, selected, tab, { tab = it }, { showProperties = false },
+                onRename = { showRename = true }, onParent = { showParent = true },
+                modifier = Modifier.fillMaxWidth().height(390.dp)
+            )
+        }
     }
 
     if (showImport) {
@@ -165,10 +179,10 @@ fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> 
     }
     if (showLayers) {
         ActionDialog("Add layer", { showLayers = false }) {
-            DialogItem("Null object") { showLayers = false; editor.addNull(); panelOpen = true }
-            DialogItem("Adjustment layer") { showLayers = false; editor.addAdjustment(); panelOpen = true }
-            DialogItem("Text") { showLayers = false; editor.addText(); panelOpen = true }
-            DialogItem("Shape") { showLayers = false; editor.addShape(); panelOpen = true }
+            DialogItem("Null object") { showLayers = false; editor.addNull(); showProperties = true }
+            DialogItem("Adjustment layer") { showLayers = false; editor.addAdjustment(); showProperties = true }
+            DialogItem("Text") { showLayers = false; editor.addText(); showProperties = true }
+            DialogItem("Shape") { showLayers = false; editor.addShape(); showProperties = true }
         }
     }
     if (showParent && selected != null) {
@@ -269,12 +283,12 @@ private fun TransportBar(editor: EditorState) {
 @Composable
 private fun EditPanel(
     editor: EditorState, layer: Layer, tab: Int, onTab: (Int) -> Unit, onCollapse: () -> Unit,
-    onRename: () -> Unit, onParent: () -> Unit
+    onRename: () -> Unit, onParent: () -> Unit, modifier: Modifier = Modifier
 ) {
     var menu by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp)
     Column(
-        Modifier.fillMaxWidth().height(214.dp).clip(shape).background(KColors.Surface).border(1.dp, KColors.Line, shape)
+        modifier.clip(shape).background(KColors.Surface).border(1.dp, KColors.Line, shape)
     ) {
         Row(Modifier.fillMaxWidth().height(42.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             TabLabel("Properties", tab == 0) { onTab(0) }
