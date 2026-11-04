@@ -19,6 +19,12 @@ object MediaLoader {
     }
     private val retrievers = HashMap<String, MediaMetadataRetriever>()
 
+    @Synchronized
+    fun releaseAll() {
+        retrievers.values.forEach { runCatching { it.release() } }
+        retrievers.clear()
+    }
+
     fun displayName(ctx: Context, uri: Uri): String {
         try {
             ctx.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
@@ -55,15 +61,15 @@ object MediaLoader {
         }
     }
 
-    /** Image bitmap, or a video frame at [timeSec] (5 fps granularity, cached). */
-    suspend fun bitmapFor(ctx: Context, uri: Uri, type: LayerType, timeSec: Float): Bitmap? =
+    /** Image bitmap, or a video frame at [timeSec] (cached frame sampling, cached). */
+    suspend fun bitmapFor(ctx: Context, uri: Uri, type: LayerType, timeSec: Float, sampleFps: Int = 5, maxEdge: Int = 960): Bitmap? =
         withContext(Dispatchers.IO) {
-            val bucket = if (type == LayerType.VIDEO) (timeSec * 5f).toInt() else 0
-            val key = "$uri@$bucket"
+            val bucket = if (type == LayerType.VIDEO) (timeSec * sampleFps.toFloat()).toInt() else 0
+            val key = if (type == LayerType.IMAGE) "$uri@image" else "$uri@$sampleFps@$maxEdge@$bucket"
             val hit = cache.get(key)
             if (hit != null) return@withContext hit
             val bmp = try {
-                if (type == LayerType.IMAGE) decodeImage(ctx, uri) else videoFrame(ctx, uri, bucket / 5f)
+                if (type == LayerType.IMAGE) decodeImage(ctx, uri) else videoFrame(ctx, uri, bucket / sampleFps.toFloat(), maxEdge)
             } catch (e: Exception) {
                 null
             }
@@ -81,13 +87,12 @@ object MediaLoader {
     }
 
     @Synchronized
-    private fun videoFrame(ctx: Context, uri: Uri, sec: Float): Bitmap? {
+    private fun videoFrame(ctx: Context, uri: Uri, sec: Float, maxEdge: Int): Bitmap? {
         val r = retrievers.getOrPut(uri.toString()) {
             MediaMetadataRetriever().apply { setDataSource(ctx, uri) }
         }
-        val f = r.getFrameAtTime((sec * 1_000_000f).toLong(), MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+        val f = r.getFrameAtTime((sec * 1_000_000f).toLong(), MediaMetadataRetriever.OPTION_CLOSEST)
             ?: return null
-        val maxEdge = 960
         val m = maxOf(f.width, f.height)
         if (m <= maxEdge) return f
         val s = maxEdge.toFloat() / m

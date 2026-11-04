@@ -61,11 +61,13 @@ import androidx.compose.ui.unit.sp
 import com.kinetic.app.data.AppSettings
 import com.kinetic.app.data.AudioEngine
 import com.kinetic.app.data.MediaLoader
+import com.kinetic.app.data.ProjectStore
 import com.kinetic.app.model.EditorState
 import com.kinetic.app.model.Layer
 import com.kinetic.app.model.LayerType
 import com.kinetic.app.model.isDescendantOf
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -77,31 +79,55 @@ fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> 
     var showImport by remember { mutableStateOf(false) }
     var showLayers by remember { mutableStateOf(false) }
     var showLeave by remember { mutableStateOf(false) }
-    var showParent by remember { mutableStateOf(false) }
-    var showRename by remember { mutableStateOf(false) }
-    var tab by remember { mutableIntStateOf(0) }
-    var showProperties by remember { mutableStateOf(false) }
-    val propertySheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     fun leave() { if (editor.layers.isEmpty()) onExit() else showLeave = true }
     BackHandler { leave() }
 
     val audio = remember { AudioEngine(ctx, scope) }
-    DisposableEffect(Unit) { onDispose { audio.release() } }
+    DisposableEffect(Unit) { onDispose { audio.release(); MediaLoader.releaseAll() } }
+    val projectStore = remember { ProjectStore(ctx) }
+    LaunchedEffect(editor.layers, editor.duration, editor.resolution, editor.projectName) {
+        delay(400)
+        withContext(Dispatchers.IO) { runCatching { projectStore.save(editor) } }
+    }
 
     LaunchedEffect(editor.playing) {
         if (editor.playing) {
             if (editor.time >= editor.duration - 0.01f) editor.time = 0f
             var last = withFrameNanos { it }
+            // Advance the transport on composition frames instead of publishing a new
+            // Compose state value on every display refresh (often 60/90/120 Hz).
+            // This prevents the whole timeline/property tree from being invalidated
+            // more often than the composition can actually display frames.
+            var transportTime = editor.time
+            var publishedFrame = (transportTime * editor.fps).toInt()
+            var audioAccumulator = 0f
             while (editor.playing) {
                 val now = withFrameNanos { it }
-                editor.time += (now - last) / 1_000_000_000f
+                val dt = ((now - last) / 1_000_000_000f).coerceIn(0f, 0.1f)
                 last = now
-                if (editor.time >= editor.duration) {
-                    if (editor.settings.loop) editor.time = 0f
-                    else { editor.time = editor.duration; editor.playing = false }
+                transportTime += dt
+                audioAccumulator += dt
+                if (transportTime >= editor.duration) {
+                    if (editor.settings.loop) {
+                        transportTime = 0f
+                        publishedFrame = -1
+                    } else {
+                        transportTime = editor.duration
+                        editor.time = editor.duration
+                        editor.playing = false
+                    }
                 }
-                audio.sync(editor.layers, editor.time, editor.playing)
+                val nextFrame = (transportTime * editor.fps).toInt()
+                if (nextFrame != publishedFrame && editor.playing) {
+                    editor.time = (nextFrame / editor.fps.toFloat()).coerceAtMost(editor.duration)
+                    publishedFrame = nextFrame
+                }
+                // Audio transport work is deliberately decoupled from the visual frame clock.
+                if (audioAccumulator >= 0.08f || !editor.playing) {
+                    audio.sync(editor.layers, transportTime, editor.playing)
+                    audioAccumulator = 0f
+                }
             }
         }
         audio.pauseAll()
@@ -110,18 +136,17 @@ fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> 
     fun importUris(uris: List<Uri>, type: LayerType) {
         scope.launch {
             for (u in uris) {
+                runCatching { ctx.contentResolver.takePersistableUriPermission(u, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
                 val info = withContext(Dispatchers.IO) { MediaLoader.probe(ctx, u, type) }
                 val name = MediaLoader.displayName(ctx, u)
                 editor.addMedia(type, name, u.toString(), info.width, info.height, info.length)
-                showProperties = true
             }
         }
     }
-    val pickVideo = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { importUris(it, LayerType.VIDEO) }
-    val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { importUris(it, LayerType.IMAGE) }
-    val pickAudio = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { importUris(it, LayerType.AUDIO) }
+    val pickVideo = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { importUris(it, LayerType.VIDEO) }
+    val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { importUris(it, LayerType.IMAGE) }
+    val pickAudio = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { importUris(it, LayerType.AUDIO) }
 
-    val selected = editor.selected
 
     Column(Modifier.fillMaxSize().background(KColors.Bg).statusBarsPadding().navigationBarsPadding()) {
         TopBar(editor, onMenuHome = { leave() }, onOpenSettings = {
@@ -132,80 +157,37 @@ fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> 
         TransportBar(editor)
         TimelinePane(editor, Modifier.weight(1f))
 
-        if (selected != null) {
-            Row(
-                Modifier.fillMaxWidth().height(36.dp).background(KColors.Surface)
-                    .clickable { showProperties = true }.padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(selected.name, color = KColors.Text, fontSize = 12.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text("EDIT  ·  PROPERTIES & GRAPH", color = KColors.Accent, fontSize = 10.sp)
-                KIcon(IconKind.CHEVRON_UP, KColors.Muted, Modifier.padding(start = 8.dp).size(18.dp))
-            }
-        }
-
         BottomToolbar(
             onSelect = { editor.select(null) },
-            onText = { editor.addText(); showProperties = true },
-            onShapes = { editor.addShape(); showProperties = true },
-            onEffects = { Toast.makeText(ctx, "Effects aren't added yet", Toast.LENGTH_SHORT).show() },
+            onText = { editor.addText() },
+            onShapes = { editor.addShape() },
             onLayers = { showLayers = true },
-            onAdjust = { editor.addAdjustment(); showProperties = true },
+            onAdjust = { editor.addAdjustment() },
             onAdd = { showImport = true }
         )
     }
 
-    if (showProperties && selected != null) {
-        ModalBottomSheet(
-            onDismissRequest = { showProperties = false },
-            sheetState = propertySheetState,
-            containerColor = KColors.Surface,
-            dragHandle = { Box(Modifier.padding(vertical = 8.dp).size(width = 42.dp, height = 4.dp).clip(CircleShape).background(KColors.Muted)) }
-        ) {
-            EditPanel(
-                editor, selected, tab, { tab = it }, { showProperties = false },
-                onRename = { showRename = true }, onParent = { showParent = true },
-                modifier = Modifier.fillMaxWidth().height(390.dp)
-            )
-        }
-    }
-
     if (showImport) {
         ActionDialog("Import media", { showImport = false }) {
-            DialogItem("Video") { showImport = false; pickVideo.launch("video/*") }
-            DialogItem("Image") { showImport = false; pickImage.launch("image/*") }
-            DialogItem("Audio") { showImport = false; pickAudio.launch("audio/*") }
+            DialogItem("Video") { showImport = false; pickVideo.launch(arrayOf("video/*")) }
+            DialogItem("Image") { showImport = false; pickImage.launch(arrayOf("image/*")) }
+            DialogItem("Audio") { showImport = false; pickAudio.launch(arrayOf("audio/*")) }
         }
     }
     if (showLayers) {
-        ActionDialog("Add layer", { showLayers = false }) {
-            DialogItem("Null object") { showLayers = false; editor.addNull(); showProperties = true }
-            DialogItem("Adjustment layer") { showLayers = false; editor.addAdjustment(); showProperties = true }
-            DialogItem("Text") { showLayers = false; editor.addText(); showProperties = true }
-            DialogItem("Shape") { showLayers = false; editor.addShape(); showProperties = true }
-        }
-    }
-    if (showParent && selected != null) {
-        val byId = editor.layers.associateBy { it.id }
-        ActionDialog("Parent of ${selected.name}", { showParent = false }) {
-            DialogItem("None") { showParent = false; editor.setParent(selected.id, null) }
-            for (c in editor.layers) {
-                if (c.id == selected.id || isDescendantOf(c, selected.id, byId)) continue
-                DialogItem(c.name) { showParent = false; editor.setParent(selected.id, c.id) }
+        ModalBottomSheet(
+            onDismissRequest = { showLayers = false },
+            containerColor = KColors.Surface,
+            dragHandle = { Box(Modifier.padding(vertical = 8.dp).size(width = 42.dp, height = 4.dp).clip(CircleShape).background(KColors.Muted)) }
+        ) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 24.dp)) {
+                Text("ADD LAYER", color = KColors.Muted, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 8.dp, bottom = 8.dp))
+                DialogItem("Null object") { showLayers = false; editor.addNull() }
+                DialogItem("Adjustment layer") { showLayers = false; editor.addAdjustment() }
+                DialogItem("Text") { showLayers = false; editor.addText() }
+                DialogItem("Shape") { showLayers = false; editor.addShape() }
             }
         }
-    }
-    if (showRename && selected != null) {
-        val isText = selected.type == LayerType.TEXT
-        TextInputDialog(
-            title = if (isText) "Edit text" else "Rename layer",
-            initial = if (isText) selected.text else selected.name,
-            onDone = { s ->
-                if (isText) editor.setText(selected.id, s) else if (s.isNotBlank()) editor.renameLayer(selected.id, s)
-                showRename = false
-            },
-            onDismiss = { showRename = false }
-        )
     }
     if (showLeave) {
         AlertDialog(
@@ -315,7 +297,7 @@ private fun EditPanel(
 
 @Composable
 private fun BottomToolbar(
-    onSelect: () -> Unit, onText: () -> Unit, onShapes: () -> Unit, onEffects: () -> Unit,
+    onSelect: () -> Unit, onText: () -> Unit, onShapes: () -> Unit,
     onLayers: () -> Unit, onAdjust: () -> Unit, onAdd: () -> Unit
 ) {
     val shape = RoundedCornerShape(30.dp)
@@ -327,7 +309,6 @@ private fun BottomToolbar(
         ToolItem("Select", IconKind.SELECT, Modifier.weight(1f), onSelect)
         ToolItem("Text", IconKind.TEXT, Modifier.weight(1f), onText)
         ToolItem("Shapes", IconKind.SHAPES, Modifier.weight(1f), onShapes)
-        ToolItem("Effects", IconKind.STAR, Modifier.weight(1f), onEffects)
         ToolItem("Layers", IconKind.LAYERS, Modifier.weight(1f), onLayers)
         ToolItem("Adjust", IconKind.SLIDERS, Modifier.weight(1f), onAdjust)
         Box(Modifier.width(1.dp).height(36.dp).background(KColors.Line))

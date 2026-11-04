@@ -206,10 +206,11 @@ fun GraphPanel(editor: EditorState, layer: Layer, modifier: Modifier = Modifier)
                             1 -> if (idx in ks.indices) {
                                 val prevT = if (idx > 0) ks[idx - 1].t + editor.frame / 2f else 0f
                                 val nextT = if (idx < ks.size - 1) ks[idx + 1].t - editor.frame / 2f else editor.duration
-                                val nt = g.t(x).coerceIn(prevT, max(prevT, nextT))
+                                // A value-graph point edits the value only. Retiming is performed
+                                // with the keyframe diamond in the timeline lane.
                                 var nv = g.v(y)
                                 if (s == PropId.OPACITY) nv = nv.coerceIn(0f, 100f)
-                                editor.replaceKey(l.id, s, idx, ks[idx].copy(t = nt, v = nv), push = false)
+                                editor.replaceKey(l.id, s, idx, ks[idx].copy(v = nv), push = false)
                             }
                             2, 3 -> if (idx in 0 until ks.size - 1) {
                                 val a = ks[idx]
@@ -305,10 +306,15 @@ fun GraphPanel(editor: EditorState, layer: Layer, modifier: Modifier = Modifier)
                 Chip("Ease out", k.type == KeyType.BEZIER && k.x1 == 0f && k.x2 == 0.58f) {
                     set(k.copy(type = KeyType.BEZIER, x1 = 0f, y1 = 0f, x2 = 0.58f, y2 = 1f))
                 }
+                Chip("Elastic", k.type == KeyType.ELASTIC) { set(k.copy(type = KeyType.ELASTIC)) }
+                Chip("Bounce", k.type == KeyType.BOUNCE) { set(k.copy(type = KeyType.BOUNCE)) }
+                Chip("Wiggle", prop.expression?.startsWith("wiggle", true) == true) {
+                    editor.setExpression(layer.id, sel, if (prop.expression == null) "wiggle(2, 20)" else null)
+                }
                 Chip("Delete", false) { editor.deleteKey(layer.id, sel, sk) }
             } else {
                 Text(
-                    "Tap a keyframe to edit it. Drag points to retime or change value.",
+                    "Drag points vertically to change value. Drag timeline diamonds to retime.",
                     color = KColors.Dim, fontSize = 11.sp
                 )
             }

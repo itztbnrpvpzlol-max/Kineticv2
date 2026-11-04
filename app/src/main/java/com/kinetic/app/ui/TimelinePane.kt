@@ -14,6 +14,9 @@ import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -31,25 +34,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -81,12 +76,13 @@ import com.kinetic.app.model.fmt
 import com.kinetic.app.model.Layer
 import com.kinetic.app.model.LayerType
 import com.kinetic.app.model.PropId
+import com.kinetic.app.model.isDescendantOf
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlin.random.Random
 
-private val LEFT_W = 108.dp
+private val LEFT_W = 176.dp
 private val ROW_H = 40.dp
 
 fun clipColor(t: LayerType): Color = when (t) {
@@ -117,6 +113,8 @@ fun TimelinePane(editor: EditorState, modifier: Modifier = Modifier) {
     val hScroll = rememberScrollState()
     val vScroll = rememberScrollState()
     var paneW by remember { mutableIntStateOf(0) }
+    var expandedLayers by remember { mutableStateOf(setOf<String>()) }
+    var graphSelection by remember { mutableStateOf<Pair<String, PropId>?>(null) }
     val leftPx = with(density) { LEFT_W.toPx() }
     val contentSec = max(editor.duration, editor.layers.maxOfOrNull { it.end } ?: 0f)
     val contentW = (contentSec * pps).dp + 96.dp
@@ -146,17 +144,30 @@ fun TimelinePane(editor: EditorState, modifier: Modifier = Modifier) {
                     Ruler(editor, pps, contentW)
                 }
             }
-            Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(vScroll)) {
+            LazyColumn(
+                Modifier.weight(1f).fillMaxWidth(),
+                state = rememberLazyListState(),
+                // Stable item keys let Compose retain only the visible layer rows.
+                // Large projects no longer compose every layer and every property row.
+            ) {
                 if (editor.layers.isEmpty()) {
-                    Box(Modifier.fillMaxWidth().padding(top = 28.dp, start = 24.dp, end = 24.dp), contentAlignment = Alignment.Center) {
-                        Text(
-                            "Empty composition. Tap + to import media or add a layer.",
-                            color = KColors.Dim, fontSize = 13.sp, textAlign = TextAlign.Center
-                        )
+                    item(key = "empty-timeline") {
+                        Box(Modifier.fillMaxWidth().padding(top = 28.dp, start = 24.dp, end = 24.dp), contentAlignment = Alignment.Center) {
+                            Text(
+                                "Empty composition. Tap + to import media or add a layer.",
+                                color = KColors.Dim, fontSize = 13.sp, textAlign = TextAlign.Center
+                            )
+                        }
                     }
                 }
-                for (layer in editor.layers) {
-                    key(layer.id) { LayerRow(editor, layer, pps, hScroll, contentW) }
+                items(editor.layers, key = { it.id }) { layer ->
+                    LayerRow(
+                        editor, layer, pps, hScroll, contentW,
+                        expanded = layer.id in expandedLayers,
+                        onToggleExpanded = { expandedLayers = if (layer.id in expandedLayers) expandedLayers - layer.id else expandedLayers + layer.id },
+                        graphSelection = graphSelection,
+                        onGraphSelection = { graphSelection = if (graphSelection == (layer.id to it)) null else layer.id to it }
+                    )
                 }
             }
         }
@@ -216,7 +227,11 @@ private fun Ruler(editor: EditorState, pps: Float, contentW: Dp) {
 }
 
 @Composable
-private fun LayerRow(editor: EditorState, layer: Layer, pps: Float, hScroll: ScrollState, contentW: Dp) {
+private fun LayerRow(
+    editor: EditorState, layer: Layer, pps: Float, hScroll: ScrollState, contentW: Dp,
+    expanded: Boolean, onToggleExpanded: () -> Unit,
+    graphSelection: Pair<String, PropId>?, onGraphSelection: (PropId) -> Unit
+) {
     val selected = editor.selectedId == layer.id
     val dens = LocalDensity.current.density
     var acc by remember { mutableFloatStateOf(0f) }
@@ -261,7 +276,8 @@ private fun LayerRow(editor: EditorState, layer: Layer, pps: Float, hScroll: Scr
                                 val step = 40f * dens
                                 val targetIndex = (from + (parentDrag / step).roundToInt()).coerceIn(editor.layers.indices)
                                 val target = editor.layers.getOrNull(targetIndex)
-                                if (target != null && target.id != layer.id && target.type == LayerType.NULL) {
+                                val byId = editor.layers.associateBy { it.id }
+                                if (target != null && target.id != layer.id && !isDescendantOf(target, layer.id, byId)) {
                                     editor.setParent(layer.id, target.id)
                                 }
                                 isParentDragging = false; parentDrag = 0f
@@ -278,12 +294,36 @@ private fun LayerRow(editor: EditorState, layer: Layer, pps: Float, hScroll: Scr
                         drawCircle(KColors.Accent, 4.dp.toPx(), Offset(x, size.height / 2f + parentDrag))
                     }
                 }
+                Box(Modifier.size(32.dp).clickable(onClick = onToggleExpanded), contentAlignment = Alignment.Center) {
+                    KIcon(if (expanded) IconKind.CHEVRON_DOWN else IconKind.CHEVRON_UP, if (expanded) KColors.Accent else KColors.Dim, Modifier.size(17.dp))
+                }
+                Box(Modifier.size(32.dp).clickable {
+                    val prop = editor.selectedProp?.takeIf { layer.p(it).animated }
+                        ?: PropId.values().firstOrNull { layer.p(it).animated }
+                        ?: PropId.POS_X
+                    editor.selectProp(prop)
+                    if (!expanded) onToggleExpanded()
+                    onGraphSelection(prop)
+                }, contentAlignment = Alignment.Center) {
+                    Text("∿", color = if (graphSelection?.first == layer.id) KColors.Accent else KColors.Dim, fontSize = 20.sp)
+                }
             }
             Box(Modifier.weight(1f).fillMaxHeight().horizontalScroll(hScroll)) {
                 Box(Modifier.width(contentW).fillMaxHeight()) { Clip(editor, layer, pps, selected) }
             }
         }
-        if (selected) KeyframeLane(editor, layer, pps, hScroll, contentW)
+        val parentName = layer.parentId?.let { id -> editor.layers.firstOrNull { it.id == id }?.name }
+        if (parentName != null) {
+            Row(Modifier.fillMaxWidth().height(20.dp).background(KColors.Row), verticalAlignment = Alignment.CenterVertically) {
+                Text("╰── Parent: $parentName", color = KColors.Accent, fontSize = 10.sp, modifier = Modifier.padding(start = 14.dp))
+            }
+        }
+        if (expanded) TransformTimelineGroup(
+            editor, layer, pps, hScroll, contentW,
+            graphOpen = graphSelection?.first == layer.id,
+            graphProp = graphSelection?.takeIf { it.first == layer.id }?.second,
+            onGraphSelection = onGraphSelection
+        )
     }
 }
 
@@ -385,42 +425,93 @@ private fun Waveform(seed: String) {
 }
 
 @Composable
-private fun KeyframeLane(editor: EditorState, layer: Layer, pps: Float, hScroll: ScrollState, contentW: Dp) {
+private fun TransformTimelineGroup(
+    editor: EditorState, layer: Layer, pps: Float, hScroll: ScrollState, contentW: Dp,
+    graphOpen: Boolean, graphProp: PropId?, onGraphSelection: (PropId) -> Unit
+) {
+    Row(Modifier.fillMaxWidth().height(28.dp).background(KColors.Surface2), verticalAlignment = Alignment.CenterVertically) {
+        Text("TRANSFORM", color = KColors.Accent, fontSize = 10.sp, modifier = Modifier.padding(start = 14.dp).weight(1f))
+        if (layer.type != LayerType.AUDIO) {
+            Text("SCALE", color = KColors.Muted, fontSize = 9.sp, modifier = Modifier.padding(end = 8.dp))
+            Box(Modifier.padding(end = 10.dp).clip(RoundedCornerShape(6.dp)).background(if (layer.scaleLinked) KColors.Accent.copy(alpha = .22f) else KColors.Row).clickable { editor.toggleScaleLink(layer.id) }.padding(horizontal = 8.dp, vertical = 4.dp)) {
+                Text(if (layer.scaleLinked) "X = Y" else "X / Y", color = if (layer.scaleLinked) KColors.Accent else KColors.Muted, fontSize = 9.sp)
+            }
+        }
+    }
+    if (layer.type != LayerType.AUDIO) {
+        for (id in PropId.values()) {
+            PropertyTimelineRow(editor, layer, id, pps, hScroll, contentW, graphProp == id, onGraphSelection)
+            if (graphOpen && graphProp == id) {
+                GraphPanel(editor, layer, Modifier.fillMaxWidth().height(208.dp).background(KColors.Bg))
+            }
+        }
+    }
+}
+
+@Composable
+private fun PropertyTimelineRow(
+    editor: EditorState, layer: Layer, id: PropId, pps: Float, hScroll: ScrollState, contentW: Dp,
+    graphSelected: Boolean, onGraphSelection: (PropId) -> Unit
+) {
     val dens = LocalDensity.current.density
-    val props = editor.selectedProp?.let { listOf(it) } ?: PropId.values().toList()
-    Row(Modifier.fillMaxWidth().height(24.dp).background(KColors.Row)) {
-        Box(Modifier.width(LEFT_W).fillMaxHeight(), contentAlignment = Alignment.CenterStart) {
-            Text(
-                editor.selectedProp?.label ?: "Keyframes", color = KColors.Muted, fontSize = 10.sp,
-                maxLines = 1, modifier = Modifier.padding(start = 10.dp)
-            )
+    val prop = layer.p(id)
+    val latestKeys by rememberUpdatedState(prop.keys)
+    Row(Modifier.fillMaxWidth().height(34.dp).background(if (editor.selectedProp == id) KColors.RowSel else KColors.Row)) {
+        Row(Modifier.width(LEFT_W).fillMaxHeight().padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(id.label, color = if (editor.selectedProp == id) KColors.Text else KColors.Muted, fontSize = 10.sp, modifier = Modifier.weight(1f).clickable { editor.selectProp(id) }, maxLines = 1)
+            Box(
+                Modifier.width(62.dp).height(28.dp)
+                    .pointerInput(layer.id, id) {
+                        detectHorizontalDragGestures(onDragStart = { editor.beginEdit() }) { change, dx ->
+                            change.consume()
+                            val current = editor.layers.firstOrNull { it.id == layer.id }?.p(id)?.valueAt(editor.time) ?: prop.valueAt(editor.time)
+                            editor.setPropValue(layer.id, id, current + dx / dens * id.scrubStep * editor.settings.scrubMultiplier)
+                        }
+                    }, contentAlignment = Alignment.Center
+            ) { Text(id.format(prop.valueAt(editor.time)), color = KColors.Accent, fontSize = 9.sp, maxLines = 1) }
+            Box(Modifier.size(24.dp).clickable { editor.toggleStopwatch(layer.id, id) }, contentAlignment = Alignment.Center) {
+                KIcon(IconKind.STOPWATCH, if (prop.animated) KColors.Accent else KColors.Dim, Modifier.size(14.dp))
+            }
+            val hasKey = prop.keys.any { kotlin.math.abs(it.t - editor.time) <= editor.frame / 2f }
+            Box(Modifier.size(24.dp).clickable { editor.toggleKeyAtTime(layer.id, id) }, contentAlignment = Alignment.Center) {
+                KIcon(if (hasKey) IconKind.DIAMOND_FILLED else IconKind.DIAMOND, if (hasKey) KColors.Accent else KColors.Dim, Modifier.size(14.dp))
+            }
+            Box(Modifier.size(24.dp).clickable { editor.selectProp(id); onGraphSelection(id) }, contentAlignment = Alignment.Center) {
+                Text("∿", color = if (graphSelected) KColors.Accent else KColors.Dim, fontSize = 18.sp)
+            }
         }
         Box(Modifier.weight(1f).fillMaxHeight().horizontalScroll(hScroll)) {
-            Canvas(
-                Modifier
-                    .width(contentW)
-                    .fillMaxHeight()
-                    .pointerInput(layer, pps, props) {
-                        detectTapGestures { o ->
-                            var best: Triple<PropId, Int, Float>? = null
-                            var bd = 20.dp.toPx()
-                            for (p in props) layer.p(p).keys.forEachIndexed { i, k ->
-                                val d = abs(k.t * pps * dens - o.x)
-                                if (d < bd) { bd = d; best = Triple(p, i, k.t) }
-                            }
-                            best?.let { editor.selectKey(it.first, it.second, it.third) }
-                        }
+            Canvas(Modifier.width(contentW).fillMaxHeight()
+                .pointerInput(layer.id, id, pps) {
+                    detectTapGestures { o ->
+                        val keysNow = latestKeys
+                        val nearest = keysNow.indices.minByOrNull { i -> abs(keysNow[i].t * pps * dens - o.x) }
+                        if (nearest != null && abs(keysNow[nearest].t * pps * dens - o.x) < 22.dp.toPx()) editor.selectKey(id, nearest, keysNow[nearest].t)
+                        else editor.selectProp(id)
                     }
-            ) {
-                val r = 5.dp.toPx()
+                }
+                .pointerInput(layer.id, id, pps) {
+                    var dragIndex = -1
+                    detectDragGestures(
+                        onDragStart = { o ->
+                            val keysNow = latestKeys
+                            dragIndex = keysNow.indices.minByOrNull { i -> abs(keysNow[i].t * pps * dens - o.x) } ?: -1
+                            if (dragIndex >= 0 && abs(keysNow[dragIndex].t * pps * dens - o.x) < 26.dp.toPx()) {
+                                editor.selectKey(id, dragIndex, null); editor.beginEdit()
+                            } else dragIndex = -1
+                        },
+                        onDragEnd = { dragIndex = -1 }, onDragCancel = { dragIndex = -1 }
+                    ) { change, _ ->
+                        change.consume()
+                        if (dragIndex in latestKeys.indices) editor.moveKeyTime(layer.id, id, dragIndex, (change.position.x / dens / pps).coerceIn(0f, editor.duration))
+                    }
+                }) {
                 val cy = size.height / 2f
-                for (p in props) layer.p(p).keys.forEachIndexed { i, k ->
-                    val x = k.t * pps * dens
-                    val d = Path().apply {
-                        moveTo(x, cy - r); lineTo(x + r, cy); lineTo(x, cy + r); lineTo(x - r, cy); close()
-                    }
-                    val isSel = editor.selectedProp == p && editor.selectedKey == i
-                    drawPath(d, if (isSel) Color.White else KColors.Accent)
+                val r = 5.dp.toPx()
+                prop.keys.forEachIndexed { i, key ->
+                    val x = key.t * pps * dens
+                    val diamond = Path().apply { moveTo(x, cy-r); lineTo(x+r, cy); lineTo(x, cy+r); lineTo(x-r, cy); close() }
+                    drawPath(diamond, if (editor.selectedProp == id && editor.selectedKey == i) Color.White else KColors.Accent)
                 }
             }
         }

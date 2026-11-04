@@ -4,6 +4,7 @@ import android.graphics.Matrix
 import java.util.Locale
 import java.util.UUID
 import kotlin.math.abs
+import kotlin.math.pow
 
 const val COMP_W = 1920f
 const val COMP_H = 1080f
@@ -34,7 +35,7 @@ enum class PropId(val label: String, val scrubStep: Float) {
     }
 }
 
-enum class KeyType { LINEAR, HOLD, BEZIER }
+enum class KeyType { LINEAR, HOLD, BEZIER, ELASTIC, BOUNCE }
 
 /**
  * A keyframe. The segment from this key to the next one is shaped by [type];
@@ -63,10 +64,24 @@ fun cubicProgress(u: Float, x1: Float, y1: Float, x2: Float, y2: Float): Float {
     return bez((lo + hi) / 2f, y1, y2)
 }
 
-data class Prop(val base: Float, val keys: List<Keyframe> = emptyList()) {
+data class Prop(val base: Float, val keys: List<Keyframe> = emptyList(), val expression: String? = null) {
     val animated: Boolean get() = keys.isNotEmpty()
 
     fun valueAt(t: Float): Float {
+        val expr = expression?.trim()
+        if (expr != null) {
+            val match = Regex("wiggle\\s*\\(\\s*([0-9.]+)\\s*,\\s*([0-9.]+)\\s*\\)", RegexOption.IGNORE_CASE).find(expr)
+            if (match != null) {
+                val frequency = match.groupValues[1].toFloatOrNull() ?: 2f
+                val amplitude = match.groupValues[2].toFloatOrNull() ?: 20f
+                val noise = kotlin.math.sin(t * frequency * 6.2831855f) * 0.55f + kotlin.math.sin(t * frequency * 13.7f) * 0.3f + kotlin.math.sin(t * frequency * 31.1f) * 0.15f
+                return (if (keys.isEmpty()) base else valueAtWithoutExpression(t)) + amplitude * noise
+            }
+        }
+        return valueAtWithoutExpression(t)
+    }
+
+    private fun valueAtWithoutExpression(t: Float): Float {
         if (keys.isEmpty()) return base
         if (t <= keys.first().t) return keys.first().v
         if (t >= keys.last().t) return keys.last().v
@@ -79,6 +94,18 @@ data class Prop(val base: Float, val keys: List<Keyframe> = emptyList()) {
             KeyType.HOLD -> 0f
             KeyType.LINEAR -> u
             KeyType.BEZIER -> cubicProgress(u, a.x1, a.y1, a.x2, a.y2)
+            KeyType.ELASTIC -> {
+                if (u <= 0f || u >= 1f) u else (2.0.pow(-10.0 * u) * kotlin.math.sin((u * 10.0 - 0.75) * (2.0 * Math.PI / 3.0)) + 1.0).toFloat()
+            }
+            KeyType.BOUNCE -> {
+                val x = u
+                when {
+                    x < 1f / 2.75f -> 7.5625f * x * x
+                    x < 2f / 2.75f -> { val q = x - 1.5f / 2.75f; 7.5625f * q * q + 0.75f }
+                    x < 2.5f / 2.75f -> { val q = x - 2.25f / 2.75f; 7.5625f * q * q + 0.9375f }
+                    else -> { val q = x - 2.625f / 2.75f; 7.5625f * q * q + 0.984375f }
+                }
+            }
         }
         return a.v + (b.v - a.v) * p
     }
