@@ -153,9 +153,20 @@ fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> 
             editor.playing = false; onOpenSettings()
         }, onExport = { Toast.makeText(ctx, "Export isn't built yet", Toast.LENGTH_SHORT).show() })
 
-        PreviewCanvas(editor, Modifier.fillMaxWidth().aspectRatio(16f / 9f))
+        Box(
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 7.dp)
+                .clip(RoundedCornerShape(16.dp)).background(KColors.Surface)
+                .border(1.dp, KColors.Line, RoundedCornerShape(16.dp)).padding(6.dp)
+        ) {
+            PreviewCanvas(editor, Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(10.dp)))
+        }
         TransportBar(editor)
-        TimelinePane(editor, Modifier.weight(1f))
+        TimelinePane(
+            editor,
+            Modifier.weight(1f).padding(horizontal = 8.dp)
+                .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+                .background(KColors.Surface)
+        )
 
         BottomToolbar(
             onSelect = { editor.select(null) },
@@ -194,7 +205,7 @@ fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> 
             onDismissRequest = { showLeave = false },
             containerColor = KColors.Surface,
             title = { Text("Leave composition?", color = KColors.Text) },
-            text = { Text("Compositions aren't saved yet, so this one will be discarded.", color = KColors.Muted) },
+            text = { Text("Your composition is saved automatically. You can safely leave and continue later.", color = KColors.Muted) },
             confirmButton = { TextButton(onClick = { showLeave = false; onExit() }) { Text("Leave", color = KColors.Danger) } },
             dismissButton = { TextButton(onClick = { showLeave = false }) { Text("Stay", color = KColors.Muted) } }
         )
@@ -214,7 +225,7 @@ private fun TopBar(editor: EditorState, onMenuHome: () -> Unit, onOpenSettings: 
             }
         }
         Text(
-            "Untitled", color = KColors.Text, fontSize = 20.sp, fontWeight = FontWeight.SemiBold,
+            editor.projectName, color = KColors.Text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
             modifier = Modifier.weight(1f).padding(start = 6.dp), maxLines = 1, overflow = TextOverflow.Ellipsis
         )
         Box {
@@ -240,24 +251,23 @@ private fun TopBar(editor: EditorState, onMenuHome: () -> Unit, onOpenSettings: 
 
 @Composable
 private fun TransportBar(editor: EditorState) {
-    Row(Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-        Row(Modifier.weight(1f)) {
-            Text(editor.settings.formatTime(editor.time), color = KColors.Text, fontSize = 15.sp)
-            Text(" / ${editor.settings.formatTime(editor.duration)}", color = KColors.Muted, fontSize = 15.sp)
+    Row(Modifier.fillMaxWidth().height(58.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            Text(editor.settings.formatTime(editor.time), color = KColors.Text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            Text("OF  " + editor.settings.formatTime(editor.duration), color = KColors.Dim, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
         }
         Box(
-            Modifier.size(44.dp).clip(CircleShape).clickable { editor.playing = !editor.playing },
+            Modifier.size(42.dp).clip(CircleShape).background(KColors.Fab).clickable { editor.playing = !editor.playing },
             contentAlignment = Alignment.Center
-        ) { KIcon(if (editor.playing) IconKind.PAUSE else IconKind.PLAY, KColors.Text, Modifier.size(26.dp)) }
-        Row(Modifier.weight(1f), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier.size(44.dp).alpha(if (editor.canUndo) 1f else 0.35f).clickable(enabled = editor.canUndo) { editor.undo() },
-                contentAlignment = Alignment.Center
-            ) { KIcon(IconKind.UNDO, KColors.Text, Modifier.size(24.dp)) }
-            Box(
-                Modifier.size(44.dp).alpha(if (editor.canRedo) 1f else 0.35f).clickable(enabled = editor.canRedo) { editor.redo() },
-                contentAlignment = Alignment.Center
-            ) { KIcon(IconKind.REDO, KColors.Text, Modifier.size(24.dp)) }
+        ) { KIcon(if (editor.playing) IconKind.PAUSE else IconKind.PLAY, KColors.Text, Modifier.size(22.dp)) }
+        Spacer(Modifier.width(12.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(36.dp).alpha(if (editor.canUndo) 1f else 0.3f).clickable(enabled = editor.canUndo) { editor.undo() }, contentAlignment = Alignment.Center) {
+                KIcon(IconKind.UNDO, KColors.Muted, Modifier.size(21.dp))
+            }
+            Box(Modifier.size(36.dp).alpha(if (editor.canRedo) 1f else 0.3f).clickable(enabled = editor.canRedo) { editor.redo() }, contentAlignment = Alignment.Center) {
+                KIcon(IconKind.REDO, KColors.Muted, Modifier.size(21.dp))
+            }
         }
     }
 }
