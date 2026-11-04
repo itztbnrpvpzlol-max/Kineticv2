@@ -39,6 +39,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Slider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -63,6 +64,8 @@ import com.kinetic.app.data.AudioEngine
 import com.kinetic.app.data.MediaLoader
 import com.kinetic.app.data.ProjectStore
 import com.kinetic.app.model.EditorState
+import com.kinetic.app.model.EffectType
+import com.kinetic.app.model.LayerEffect
 import com.kinetic.app.model.Layer
 import com.kinetic.app.model.LayerType
 import com.kinetic.app.model.isDescendantOf
@@ -78,6 +81,7 @@ fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> 
     val scope = rememberCoroutineScope()
     var showImport by remember { mutableStateOf(false) }
     var showLayers by remember { mutableStateOf(false) }
+    var showEffects by remember { mutableStateOf(false) }
     var showLeave by remember { mutableStateOf(false) }
 
     fun leave() { if (editor.layers.isEmpty()) onExit() else showLeave = true }
@@ -173,7 +177,7 @@ fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> 
             onText = { editor.addText() },
             onShapes = { editor.addShape() },
             onLayers = { showLayers = true },
-            onAdjust = { editor.addAdjustment() },
+            onAdjust = { showEffects = true },
             onAdd = { showImport = true }
         )
     }
@@ -200,6 +204,47 @@ fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> 
             }
         }
     }
+    if (showEffects) {
+        ModalBottomSheet(
+            onDismissRequest = { showEffects = false },
+            containerColor = KColors.Surface,
+            dragHandle = { Box(Modifier.padding(vertical = 8.dp).size(width = 42.dp, height = 4.dp).clip(CircleShape).background(KColors.Muted)) }
+        ) {
+            val layer = editor.selected
+            Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp).padding(bottom = 28.dp)) {
+                Text("EFFECTS", color = KColors.Text, fontSize = 16.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                Text(layer?.name ?: "Select a layer in the timeline first", color = KColors.Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 3.dp, bottom = 14.dp))
+                if (layer == null) {
+                    Text("Choose a layer, then open Effects to build its effect stack.", color = KColors.Dim, fontSize = 13.sp)
+                } else {
+                    if (layer.effects.isEmpty()) {
+                        Text("No effects yet. Add one below — the preview updates immediately.", color = KColors.Dim, fontSize = 12.sp, modifier = Modifier.padding(vertical = 8.dp))
+                    }
+                    layer.effects.forEach { effect ->
+                        EffectControl(
+                            effect = effect,
+                            onToggle = { editor.toggleEffect(layer.id, effect.id) },
+                            onRemove = { editor.removeEffect(layer.id, effect.id) },
+                            onAmount = { editor.setEffectAmount(layer.id, effect.id, it) }
+                        )
+                    }
+                    Text("ADD EFFECT", color = KColors.Muted, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, modifier = Modifier.padding(top = 14.dp, bottom = 8.dp))
+                    EffectType.values().filterNot { type -> layer.effects.any { it.type == type } }.chunked(2).forEach { pair ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            pair.forEach { type ->
+                                Box(
+                                    Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).background(KColors.Surface2)
+                                        .clickable { editor.addEffect(layer.id, type) }.padding(horizontal = 12.dp, vertical = 12.dp)
+                                ) { Text("+  " + type.label, color = KColors.Text, fontSize = 12.sp) }
+                            }
+                            if (pair.size == 1) Spacer(Modifier.weight(1f))
+                        }
+                        Spacer(Modifier.height(7.dp))
+                    }
+                }
+            }
+        }
+    }
     if (showLeave) {
         AlertDialog(
             onDismissRequest = { showLeave = false },
@@ -209,6 +254,42 @@ fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> 
             confirmButton = { TextButton(onClick = { showLeave = false; onExit() }) { Text("Leave", color = KColors.Danger) } },
             dismissButton = { TextButton(onClick = { showLeave = false }) { Text("Stay", color = KColors.Muted) } }
         )
+    }
+}
+
+@Composable
+private fun EffectControl(
+    effect: LayerEffect,
+    onToggle: () -> Unit,
+    onRemove: () -> Unit,
+    onAmount: (Float) -> Unit
+) {
+    val range = when (effect.type) {
+        EffectType.BRIGHTNESS -> -100f..100f
+        EffectType.HUE -> -180f..180f
+        EffectType.CONTRAST, EffectType.SATURATION -> 0f..200f
+        EffectType.GRAYSCALE, EffectType.INVERT -> 0f..100f
+    }
+    Column(
+        Modifier.fillMaxWidth().padding(vertical = 5.dp).clip(RoundedCornerShape(12.dp))
+            .background(KColors.Surface2).padding(horizontal = 12.dp, vertical = 9.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(effect.type.label, color = if (effect.enabled) KColors.Text else KColors.Muted, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Text(if (effect.enabled) "ON" else "OFF", color = if (effect.enabled) KColors.Accent else KColors.Dim, fontSize = 10.sp,
+                modifier = Modifier.clickable(onClick = onToggle).padding(horizontal = 10.dp, vertical = 6.dp))
+            Text("×", color = KColors.Danger, fontSize = 18.sp, modifier = Modifier.clickable(onClick = onRemove).padding(horizontal = 5.dp))
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Slider(
+                value = effect.amount.coerceIn(range.start, range.endInclusive),
+                onValueChange = onAmount,
+                valueRange = range,
+                enabled = effect.enabled,
+                modifier = Modifier.weight(1f).height(34.dp)
+            )
+            Text(effect.amount.toInt().toString(), color = KColors.Muted, fontSize = 11.sp, modifier = Modifier.width(42.dp))
+        }
     }
 }
 
