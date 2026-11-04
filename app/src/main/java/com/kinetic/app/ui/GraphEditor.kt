@@ -257,10 +257,17 @@ fun GraphPanel(editor: EditorState, layer: Layer, modifier: Modifier = Modifier)
                                 val b = ks[idx + 1]
                                 val dt = max(b.t - a.t, 0.01f)
                                 val dv = b.v - a.v
-                                val tt = ((g.t(x) - a.t) / dt).coerceIn(0.001f, 0.999f)
+                                val rawT = ((g.t(x) - a.t) / dt).coerceIn(0.001f, 0.999f)
                                 val vv = (if (abs(dv) > 1e-4f) (g.v(y) - a.v) / dv else 0f).coerceIn(-2f, 3f)
-                                val nk = if (mode == 2) a.copy(type = KeyType.BEZIER, x1 = tt, y1 = vv)
-                                else a.copy(type = KeyType.BEZIER, x2 = tt, y2 = vv)
+                                // Keep the Bezier time handles ordered. A crossed pair makes
+                                // the x curve non-monotonic and breaks inverse easing evaluation.
+                                val nk = if (mode == 2) {
+                                    val outT = rawT.coerceAtMost((a.x2 - 0.001f).coerceAtLeast(0.002f))
+                                    a.copy(type = KeyType.BEZIER, x1 = outT, y1 = vv)
+                                } else {
+                                    val inT = rawT.coerceAtLeast((a.x1 + 0.001f).coerceAtMost(0.998f))
+                                    a.copy(type = KeyType.BEZIER, x2 = inT, y2 = vv)
+                                }
                                 editor.replaceKey(l.id, s, idx, nk, push = false)
                             }
                             4, 5 -> if (idx in 0 until ks.size - 1) {
