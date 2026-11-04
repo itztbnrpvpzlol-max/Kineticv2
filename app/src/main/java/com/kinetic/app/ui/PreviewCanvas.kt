@@ -1,6 +1,8 @@
 package com.kinetic.app.ui
 
 import android.graphics.Bitmap
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
 import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.graphics.RectF
@@ -22,10 +24,51 @@ import com.kinetic.app.data.MediaLoader
 import com.kinetic.app.model.COMP_H
 import com.kinetic.app.model.COMP_W
 import com.kinetic.app.model.EditorState
+import com.kinetic.app.model.EffectType
 import com.kinetic.app.model.LayerType
 import com.kinetic.app.model.PropId
 import com.kinetic.app.model.layerMatrix
 import android.graphics.Path as AndroidPath
+
+private fun makeLayerFilter(layer: com.kinetic.app.model.Layer): ColorMatrixColorFilter? {
+    val active = layer.effects.filter { it.enabled }
+    if (active.isEmpty()) return null
+    val combined = ColorMatrix()
+    for (effect in active) {
+        val amount = effect.amount
+        val matrix = ColorMatrix()
+        when (effect.type) {
+            EffectType.BRIGHTNESS -> {
+                val b = amount.coerceIn(-100f, 100f) * 2.55f
+                matrix.set(floatArrayOf(1f,0f,0f,0f,b, 0f,1f,0f,0f,b, 0f,0f,1f,0f,b, 0f,0f,0f,1f,0f))
+            }
+            EffectType.CONTRAST -> {
+                val c = amount.coerceIn(0f, 200f) / 100f
+                val offset = 128f * (1f - c)
+                matrix.set(floatArrayOf(c,0f,0f,0f,offset, 0f,c,0f,0f,offset, 0f,0f,c,0f,offset, 0f,0f,0f,1f,0f))
+            }
+            EffectType.SATURATION -> matrix.setSaturation(amount.coerceIn(0f, 200f) / 100f)
+            EffectType.HUE -> {
+                matrix.setRotate(0, amount.coerceIn(-180f, 180f))
+                val green = ColorMatrix().apply { setRotate(1, amount.coerceIn(-180f, 180f)) }
+                val blue = ColorMatrix().apply { setRotate(2, amount.coerceIn(-180f, 180f)) }
+                matrix.postConcat(green)
+                matrix.postConcat(blue)
+            }
+            EffectType.GRAYSCALE -> {
+                matrix.setSaturation(1f - amount.coerceIn(0f, 100f) / 100f)
+            }
+            EffectType.INVERT -> {
+                val a = amount.coerceIn(0f, 100f) / 100f
+                val d = 1f - 2f * a
+                val o = 255f * a
+                matrix.set(floatArrayOf(d,0f,0f,0f,o, 0f,d,0f,0f,o, 0f,0f,d,0f,o, 0f,0f,0f,1f,0f))
+            }
+        }
+        combined.postConcat(matrix)
+    }
+    return ColorMatrixColorFilter(combined)
+}
 
 @Composable
 fun PreviewCanvas(editor: EditorState, modifier: Modifier = Modifier) {
@@ -58,6 +101,9 @@ fun PreviewCanvas(editor: EditorState, modifier: Modifier = Modifier) {
             textAlign = Paint.Align.CENTER; textSize = 120f; typeface = Typeface.DEFAULT_BOLD
         }
     }
+    val filters = remember(editor.layers.map { it.id to it.effects }) {
+        editor.layers.associate { it.id to makeLayerFilter(it) }
+    }
     val outline = remember {
         Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; color = 0xFF8466FF.toInt() }
     }
@@ -84,6 +130,9 @@ fun PreviewCanvas(editor: EditorState, modifier: Modifier = Modifier) {
                 val alpha = (l.p(PropId.OPACITY).valueAt(time) * 2.55f).toInt().coerceIn(0, 255)
                 nc.save()
                 nc.concat(layerMatrix(l, time, byId))
+                val filter = filters[l.id]
+                paint.colorFilter = filter
+                textPaint.colorFilter = filter
                 when (l.type) {
                     LayerType.IMAGE, LayerType.VIDEO -> {
                         val bmp = bitmaps[l.id]
@@ -105,6 +154,8 @@ fun PreviewCanvas(editor: EditorState, modifier: Modifier = Modifier) {
                     }
                     else -> Unit
                 }
+                paint.colorFilter = null
+                textPaint.colorFilter = null
                 nc.restore()
             }
             nc.restore()
