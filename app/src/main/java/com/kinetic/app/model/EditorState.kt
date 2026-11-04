@@ -143,9 +143,31 @@ class EditorState(val settings: AppSettings, val projectId: String = UUID.random
 
     fun setEffectAmount(layerId: String, effectId: String, amount: Float) {
         updateLayer(layerId, push = false) { layer ->
-            layer.copy(effects = layer.effects.map {
-                if (it.id == effectId) it.copy(amount = amount.coerceIn(0f, 200f)) else it
+            layer.copy(effects = layer.effects.map { effect ->
+                if (effect.id != effectId) effect else {
+                    val range = when (effect.type) {
+                        EffectType.BRIGHTNESS -> -100f..100f
+                        EffectType.HUE -> -180f..180f
+                        EffectType.CONTRAST, EffectType.SATURATION -> 0f..200f
+                        EffectType.GRAYSCALE, EffectType.INVERT -> 0f..100f
+                    }
+                    effect.copy(amount = amount.coerceIn(range.start, range.endInclusive))
+                }
             })
+        }
+    }
+
+    fun moveEffect(layerId: String, effectId: String, direction: Int) {
+        updateLayer(layerId) { layer ->
+            val index = layer.effects.indexOfFirst { it.id == effectId }
+            val target = index + direction
+            if (index < 0 || target !in layer.effects.indices) layer
+            else {
+                val reordered = layer.effects.toMutableList()
+                val item = reordered.removeAt(index)
+                reordered.add(target, item)
+                layer.copy(effects = reordered)
+            }
         }
     }
     fun addText() = addLayer(
