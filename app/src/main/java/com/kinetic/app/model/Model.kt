@@ -50,8 +50,11 @@ data class LayerEffect(
     val id: String = UUID.randomUUID().toString(),
     val type: EffectType,
     val amount: Float = type.defaultAmount,
-    val enabled: Boolean = true
-)
+    val enabled: Boolean = true,
+    val keyframes: List<Keyframe> = emptyList()
+) {
+    fun amountAt(time: Float): Float = Prop(amount, keyframes).valueAt(time)
+}
 
 /**
  * A keyframe. The segment from this key to the next one is shaped by [type];
