@@ -85,7 +85,14 @@ class ProjectStore(context: Context) {
             .put("effects", JSONArray().also { arr ->
                 l.effects.forEach { effect ->
                     arr.put(JSONObject().put("id", effect.id).put("type", effect.type.name)
-                        .put("amount", effect.amount.toDouble()).put("enabled", effect.enabled))
+                        .put("amount", effect.amount.toDouble()).put("enabled", effect.enabled)
+                        .put("keys", JSONArray().also { keys ->
+                            effect.keyframes.forEach { key ->
+                                keys.put(JSONObject().put("t", key.t.toDouble()).put("v", key.v.toDouble())
+                                    .put("type", key.type.name).put("x1", key.x1.toDouble()).put("y1", key.y1.toDouble())
+                                    .put("x2", key.x2.toDouble()).put("y2", key.y2.toDouble()))
+                            }
+                        }))
                 }
             })
     }
@@ -114,11 +121,20 @@ class ProjectStore(context: Context) {
         val effects = (0 until effectsJson.length()).mapNotNull { index ->
             val effect = effectsJson.optJSONObject(index) ?: return@mapNotNull null
             val type = runCatching { EffectType.valueOf(effect.optString("type")) }.getOrNull() ?: return@mapNotNull null
+            val keyArray = effect.optJSONArray("keys") ?: JSONArray()
+            val effectKeys = (0 until keyArray.length()).mapNotNull { keyIndex ->
+                val key = keyArray.optJSONObject(keyIndex) ?: return@mapNotNull null
+                Keyframe(key.optDouble("t").toFloat(), key.optDouble("v").toFloat(),
+                    runCatching { KeyType.valueOf(key.optString("type", "LINEAR")) }.getOrDefault(KeyType.LINEAR),
+                    key.optDouble("x1", 0.42).toFloat(), key.optDouble("y1", 0.0).toFloat(),
+                    key.optDouble("x2", 0.58).toFloat(), key.optDouble("y2", 1.0).toFloat())
+            }
             LayerEffect(
                 id = effect.optString("id", UUID.randomUUID().toString()),
                 type = type,
                 amount = effect.optDouble("amount", type.defaultAmount.toDouble()).toFloat(),
-                enabled = effect.optBoolean("enabled", true)
+                enabled = effect.optBoolean("enabled", true),
+                keyframes = effectKeys.sortedBy { it.t }
             )
         }
         return Layer(id = j.optString("id", UUID.randomUUID().toString()),
