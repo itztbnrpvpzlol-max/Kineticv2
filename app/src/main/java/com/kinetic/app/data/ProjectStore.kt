@@ -2,6 +2,8 @@ package com.kinetic.app.data
 
 import android.content.Context
 import com.kinetic.app.model.EditorState
+import com.kinetic.app.model.EffectType
+import com.kinetic.app.model.LayerEffect
 import com.kinetic.app.model.KeyType
 import com.kinetic.app.model.Keyframe
 import com.kinetic.app.model.Layer
@@ -80,6 +82,12 @@ class ProjectStore(context: Context) {
             .put("width", l.width.toDouble()).put("height", l.height.toDouble()).put("visible", l.visible)
             .put("parentId", l.parentId).put("scaleLinked", l.scaleLinked).put("text", l.text)
             .put("color", l.color).put("props", props)
+            .put("effects", JSONArray().also { arr ->
+                l.effects.forEach { effect ->
+                    arr.put(JSONObject().put("id", effect.id).put("type", effect.type.name)
+                        .put("amount", effect.amount.toDouble()).put("enabled", effect.enabled))
+                }
+            })
     }
 
     private fun layerFromJson(j: JSONObject): Layer {
@@ -102,6 +110,17 @@ class ProjectStore(context: Context) {
             Prop(p.optDouble("base", 0.0).toFloat(), keys, p.optString("expression").takeIf { it.isNotBlank() })
         }
         val srcLength = j.optDouble("srcLength", -1.0).toFloat().let { if (it < 0f) Float.POSITIVE_INFINITY else it }
+        val effectsJson = j.optJSONArray("effects") ?: JSONArray()
+        val effects = (0 until effectsJson.length()).mapNotNull { index ->
+            val effect = effectsJson.optJSONObject(index) ?: return@mapNotNull null
+            val type = runCatching { EffectType.valueOf(effect.optString("type")) }.getOrNull() ?: return@mapNotNull null
+            LayerEffect(
+                id = effect.optString("id", UUID.randomUUID().toString()),
+                type = type,
+                amount = effect.optDouble("amount", type.defaultAmount.toDouble()).toFloat(),
+                enabled = effect.optBoolean("enabled", true)
+            )
+        }
         return Layer(id = j.optString("id", UUID.randomUUID().toString()),
             type = runCatching { LayerType.valueOf(j.optString("type", "SHAPE")) }.getOrDefault(LayerType.SHAPE),
             name = j.optString("name", "Layer"), uri = j.optString("uri").takeIf { it.isNotBlank() && it != "null" },
@@ -110,6 +129,6 @@ class ProjectStore(context: Context) {
             width = j.optDouble("width", 100.0).toFloat(), height = j.optDouble("height", 100.0).toFloat(),
             visible = j.optBoolean("visible", true), parentId = j.optString("parentId").takeIf { it.isNotBlank() && it != "null" },
             scaleLinked = j.optBoolean("scaleLinked", false), text = j.optString("text", "Text"),
-            color = j.optInt("color", 0xFF8D8BA3.toInt()), props = props)
+            color = j.optInt("color", 0xFF8D8BA3.toInt()), props = props, effects = effects)
     }
 }
