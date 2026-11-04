@@ -138,6 +138,16 @@ fun TimelinePane(editor: EditorState, modifier: Modifier = Modifier) {
             .pointerInput(Unit) { detectPinch { z -> pps = (pps * z).coerceIn(18f, 400f) } }
     ) {
         Column(Modifier.fillMaxSize()) {
+            Row(
+                Modifier.fillMaxWidth().height(38.dp).padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("TIMELINE", color = KColors.Text, fontSize = 11.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, letterSpacing = 1.1.sp)
+                Spacer(Modifier.weight(1f))
+                Text("−", color = KColors.Muted, fontSize = 20.sp, modifier = Modifier.clickable { pps = (pps / 1.2f).coerceAtLeast(18f) }.padding(horizontal = 9.dp))
+                Text(pps.roundToInt().toString() + " px/s", color = KColors.Muted, fontSize = 10.sp)
+                Text("+", color = KColors.Muted, fontSize = 19.sp, modifier = Modifier.clickable { pps = (pps * 1.2f).coerceAtMost(400f) }.padding(horizontal = 9.dp))
+            }
             Row(Modifier.fillMaxWidth().height(30.dp)) {
                 Spacer(Modifier.width(LEFT_W))
                 Box(Modifier.weight(1f).fillMaxHeight().horizontalScroll(hScroll)) {
@@ -246,17 +256,11 @@ private fun LayerRow(
                 .background(if (selected) KColors.RowSel else KColors.Row)
         ) {
             Row(Modifier.width(LEFT_W).fillMaxHeight(), verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier.size(36.dp).clickable { editor.toggleVisible(layer.id) },
-                    contentAlignment = Alignment.Center
-                ) {
-                    KIcon(
-                        if (layer.visible) IconKind.EYE else IconKind.EYE_OFF,
-                        if (layer.visible) KColors.ClipText else KColors.Dim
-                    )
+                Box(Modifier.size(28.dp).clickable { editor.toggleVisible(layer.id) }, contentAlignment = Alignment.Center) {
+                    KIcon(if (layer.visible) IconKind.EYE else IconKind.EYE_OFF, if (layer.visible) KColors.ClipText else KColors.Dim, Modifier.size(15.dp))
                 }
                 Box(
-                    Modifier.size(36.dp).pointerInput(layer.id) {
+                    Modifier.size(24.dp).pointerInput(layer.id) {
                         detectDragGestures(onDragStart = { acc = 0f; editor.beginEdit() }) { change, d ->
                             change.consume()
                             acc += d.y
@@ -266,9 +270,9 @@ private fun LayerRow(
                         }
                     },
                     contentAlignment = Alignment.Center
-                ) { KIcon(IconKind.HANDLE, KColors.Dim) }
+                ) { KIcon(IconKind.HANDLE, KColors.Dim, Modifier.size(15.dp)) }
                 Box(
-                    Modifier.size(36.dp).pointerInput(layer.id, editor.layers) {
+                    Modifier.size(24.dp).pointerInput(layer.id, editor.layers) {
                         detectDragGesturesAfterLongPress(
                             onDragStart = { parentDrag = 0f; isParentDragging = true },
                             onDragEnd = {
@@ -287,17 +291,17 @@ private fun LayerRow(
                     },
                     contentAlignment = Alignment.Center
                 ) {
-                    KIcon(IconKind.PARENT, if (layer.parentId != null) KColors.Accent else KColors.Dim)
+                    KIcon(IconKind.PARENT, if (layer.parentId != null) KColors.Accent else KColors.Dim, Modifier.size(15.dp))
                     if (isParentDragging) Canvas(Modifier.fillMaxSize()) {
                         val x = size.width / 2f
                         drawLine(KColors.Accent, Offset(x, size.height / 2f), Offset(x, size.height / 2f + parentDrag), 2.dp.toPx())
                         drawCircle(KColors.Accent, 4.dp.toPx(), Offset(x, size.height / 2f + parentDrag))
                     }
                 }
-                Box(Modifier.size(32.dp).clickable(onClick = onToggleExpanded), contentAlignment = Alignment.Center) {
-                    KIcon(if (expanded) IconKind.CHEVRON_DOWN else IconKind.CHEVRON_UP, if (expanded) KColors.Accent else KColors.Dim, Modifier.size(17.dp))
+                Box(Modifier.size(22.dp).clickable(onClick = onToggleExpanded), contentAlignment = Alignment.Center) {
+                    KIcon(if (expanded) IconKind.CHEVRON_DOWN else IconKind.CHEVRON_UP, if (expanded) KColors.Accent else KColors.Dim, Modifier.size(14.dp))
                 }
-                Box(Modifier.size(32.dp).clickable {
+                Box(Modifier.size(22.dp).clickable {
                     val prop = editor.selectedProp?.takeIf { layer.p(it).animated }
                         ?: PropId.values().firstOrNull { layer.p(it).animated }
                         ?: PropId.POS_X
@@ -305,8 +309,11 @@ private fun LayerRow(
                     if (!expanded) onToggleExpanded()
                     onGraphSelection(prop)
                 }, contentAlignment = Alignment.Center) {
-                    Text("∿", color = if (graphSelection?.first == layer.id) KColors.Accent else KColors.Dim, fontSize = 20.sp)
+                    Text("∿", color = if (graphSelection?.first == layer.id) KColors.Accent else KColors.Dim, fontSize = 17.sp)
                 }
+                Text(layer.name, color = if (selected) KColors.Text else KColors.Muted, fontSize = 9.sp,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f).padding(start = 3.dp))
             }
             Box(Modifier.weight(1f).fillMaxHeight().horizontalScroll(hScroll)) {
                 Box(Modifier.width(contentW).fillMaxHeight()) { Clip(editor, layer, pps, selected) }
