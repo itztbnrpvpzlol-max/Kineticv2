@@ -124,6 +124,30 @@ class EditorState(val settings: AppSettings, val projectId: String = UUID.random
     fun addNull() = addLayer(newLayer(LayerType.NULL, nextName("Null"), time, remaining(), 100f, 100f))
     fun addAdjustment() =
         addLayer(newLayer(LayerType.ADJUSTMENT, nextName("Adjustment Layer"), time, remaining(), COMP_W, COMP_H))
+
+    fun addEffect(layerId: String, type: EffectType) {
+        val layer = layers.firstOrNull { it.id == layerId } ?: return
+        if (layer.effects.any { it.type == type }) return
+        updateLayer(layerId) { it.copy(effects = it.effects + LayerEffect(type = type)) }
+    }
+
+    fun removeEffect(layerId: String, effectId: String) {
+        updateLayer(layerId) { it.copy(effects = it.effects.filterNot { effect -> effect.id == effectId }) }
+    }
+
+    fun toggleEffect(layerId: String, effectId: String) {
+        updateLayer(layerId) { layer ->
+            layer.copy(effects = layer.effects.map { if (it.id == effectId) it.copy(enabled = !it.enabled) else it })
+        }
+    }
+
+    fun setEffectAmount(layerId: String, effectId: String, amount: Float) {
+        updateLayer(layerId, push = false) { layer ->
+            layer.copy(effects = layer.effects.map {
+                if (it.id == effectId) it.copy(amount = amount.coerceIn(0f, 200f)) else it
+            })
+        }
+    }
     fun addText() = addLayer(
         newLayer(LayerType.TEXT, "Text", time, remaining(), 800f, 200f, text = "Text", color = 0xFFFFFFFF.toInt())
     )
