@@ -37,6 +37,22 @@ enum class PropId(val label: String, val scrubStep: Float) {
 
 enum class KeyType { LINEAR, HOLD, BEZIER, ELASTIC, BOUNCE }
 
+enum class EffectType(val label: String, val defaultAmount: Float) {
+    BRIGHTNESS("Brightness", 0f),
+    CONTRAST("Contrast", 100f),
+    SATURATION("Saturation", 100f),
+    HUE("Hue", 0f),
+    GRAYSCALE("Grayscale", 100f),
+    INVERT("Invert", 100f)
+}
+
+data class LayerEffect(
+    val id: String = UUID.randomUUID().toString(),
+    val type: EffectType,
+    val amount: Float = type.defaultAmount,
+    val enabled: Boolean = true
+)
+
 /**
  * A keyframe. The segment from this key to the next one is shaped by [type];
  * for BEZIER it uses the cubic-bezier (x1,y1,x2,y2) easing, same as CSS/AE-style ease curves.
@@ -139,8 +155,8 @@ data class Layer(
     val text: String = "Text",
     val color: Int = 0xFF8D8BA3.toInt(),
     val props: Map<PropId, Prop>,
-    /** Reserved for later: adjustment layers will hold effects here. Intentionally empty for now. */
-    val effects: List<String> = emptyList()
+    /** Ordered, non-destructive effects applied to this layer. */
+    val effects: List<LayerEffect> = emptyList()
 ) {
     val end: Float get() = start + duration
     fun p(id: PropId): Prop = props.getValue(id)
