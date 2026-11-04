@@ -31,9 +31,9 @@ fun KIcon(kind: IconKind, tint: Color, modifier: Modifier = Modifier.size(22.dp)
         val sw = w * 0.09f
         val st = Stroke(width = sw, cap = StrokeCap.Round, join = StrokeJoin.Round)
         fun pt(x: Float, y: Float) = Offset(w * x, h * y)
-        fun poly(closed: Boolean, vararg pts: Offset): Path = Path().apply {
-            moveTo(pts[0].x, pts[0].y)
-            for (i in 1 until pts.size) lineTo(pts[i].x, pts[i].y)
+        fun poly(closed: Boolean, vararg pts: Any): Path = Path().apply {
+            moveTo((pts[0] as Offset).x, (pts[0] as Offset).y)
+            for (i in 1 until pts.size) lineTo((pts[i] as Offset).x, (pts[i] as Offset).y)
             if (closed) close()
         }
         fun line(a: Offset, b: Offset) = drawLine(tint, a, b, strokeWidth = sw, cap = StrokeCap.Round)
