@@ -151,7 +151,22 @@ class EditorState(val settings: AppSettings, val projectId: String = UUID.random
                         EffectType.CONTRAST, EffectType.SATURATION -> 0f..200f
                         EffectType.GRAYSCALE, EffectType.INVERT -> 0f..100f
                     }
-                    effect.copy(amount = amount.coerceIn(range.start, range.endInclusive))
+                    val clamped = amount.coerceIn(range.start, range.endInclusive)
+                    if (effect.keyframes.isEmpty()) effect.copy(amount = clamped)
+                    else effect.copy(keyframes = Prop(effect.amount, effect.keyframes).withValueAt(time, clamped, 0.04f).keys)
+                }
+            })
+        }
+    }
+
+    fun toggleEffectKeyframe(layerId: String, effectId: String) {
+        updateLayer(layerId) { layer ->
+            layer.copy(effects = layer.effects.map { effect ->
+                if (effect.id != effectId) effect else {
+                    val existing = effect.keyframes.indexOfFirst { kotlin.math.abs(it.t - time) <= 0.04f }
+                    val keys = if (existing >= 0) effect.keyframes.toMutableList().also { it.removeAt(existing) }
+                    else (effect.keyframes + Keyframe(time, effect.amountAt(time))).sortedBy { it.t }
+                    effect.copy(keyframes = keys)
                 }
             })
         }
