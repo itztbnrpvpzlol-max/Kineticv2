@@ -226,6 +226,10 @@ fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> 
                             effect = effect,
                             onToggle = { editor.toggleEffect(layer.id, effect.id) },
                             onRemove = { editor.removeEffect(layer.id, effect.id) },
+                            onMoveUp = { editor.moveEffect(layer.id, effect.id, -1) },
+                            onMoveDown = { editor.moveEffect(layer.id, effect.id, 1) },
+                            canMoveUp = layer.effects.indexOfFirst { it.id == effect.id } > 0,
+                            canMoveDown = layer.effects.indexOfFirst { it.id == effect.id } < layer.effects.lastIndex,
                             onAmount = { editor.setEffectAmount(layer.id, effect.id, it) }
                         )
                     }
@@ -264,6 +268,10 @@ private fun EffectControl(
     effect: LayerEffect,
     onToggle: () -> Unit,
     onRemove: () -> Unit,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
     onAmount: (Float) -> Unit
 ) {
     var editing by remember(effect.id) { mutableStateOf(false) }
@@ -279,8 +287,12 @@ private fun EffectControl(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(effect.type.label, color = if (effect.enabled) KColors.Text else KColors.Muted, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Text("↑", color = if (canMoveUp) KColors.Text else KColors.Dim, fontSize = 15.sp,
+                modifier = Modifier.clickable(enabled = canMoveUp, onClick = onMoveUp).padding(horizontal = 5.dp, vertical = 4.dp))
+            Text("↓", color = if (canMoveDown) KColors.Text else KColors.Dim, fontSize = 15.sp,
+                modifier = Modifier.clickable(enabled = canMoveDown, onClick = onMoveDown).padding(horizontal = 5.dp, vertical = 4.dp))
             Text(if (effect.enabled) "ON" else "OFF", color = if (effect.enabled) KColors.Accent else KColors.Dim, fontSize = 10.sp,
-                modifier = Modifier.clickable(onClick = onToggle).padding(horizontal = 10.dp, vertical = 6.dp))
+                modifier = Modifier.clickable(onClick = onToggle).padding(horizontal = 8.dp, vertical = 6.dp))
             Text("×", color = KColors.Danger, fontSize = 18.sp, modifier = Modifier.clickable(onClick = onRemove).padding(horizontal = 5.dp))
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
