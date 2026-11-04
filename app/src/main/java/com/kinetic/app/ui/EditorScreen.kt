@@ -222,6 +222,7 @@ fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> 
                     }
                     layer.effects.forEach { effect ->
                         EffectControl(
+                            editor = editor,
                             effect = effect,
                             onToggle = { editor.toggleEffect(layer.id, effect.id) },
                             onRemove = { editor.removeEffect(layer.id, effect.id) },
@@ -259,11 +260,13 @@ fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> 
 
 @Composable
 private fun EffectControl(
+    editor: EditorState,
     effect: LayerEffect,
     onToggle: () -> Unit,
     onRemove: () -> Unit,
     onAmount: (Float) -> Unit
 ) {
+    var editing by remember(effect.id) { mutableStateOf(false) }
     val range = when (effect.type) {
         EffectType.BRIGHTNESS -> -100f..100f
         EffectType.HUE -> -180f..180f
@@ -283,7 +286,11 @@ private fun EffectControl(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Slider(
                 value = effect.amount.coerceIn(range.start, range.endInclusive),
-                onValueChange = onAmount,
+                onValueChange = {
+                    if (!editing) { editor.beginEdit(); editing = true }
+                    onAmount(it)
+                },
+                onValueChangeFinished = { editing = false },
                 valueRange = range,
                 enabled = effect.enabled,
                 modifier = Modifier.weight(1f).height(34.dp)
