@@ -408,7 +408,7 @@ private fun BottomToolbar(
         ToolItem("Text", IconKind.TEXT, Modifier.weight(1f), onText)
         ToolItem("Shapes", IconKind.SHAPES, Modifier.weight(1f), onShapes)
         ToolItem("Layers", IconKind.LAYERS, Modifier.weight(1f), onLayers)
-        ToolItem("Adjust", IconKind.SLIDERS, Modifier.weight(1f), onAdjust)
+        ToolItem("Effects", IconKind.SLIDERS, Modifier.weight(1f), onAdjust)
         Box(Modifier.width(1.dp).height(36.dp).background(KColors.Line))
         Box(
             Modifier.padding(start = 8.dp, end = 2.dp).size(50.dp).clip(CircleShape).background(KColors.Fab).clickable(onClick = onAdd),
