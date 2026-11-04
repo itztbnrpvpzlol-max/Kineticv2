@@ -56,8 +56,8 @@ fun HomeScreen(
             NewCompositionCard(onNewComposition)
             Spacer(Modifier.height(14.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                ActionButton("Import project", onImportProject, Modifier.weight(1f), IconKind.IMPORT)
-                ActionButton("Import plugin", onImportPlugin, Modifier.weight(1f), IconKind.PLUG)
+                ActionButton("Import project", onImportProject, Modifier.weight(1f), IconKind.IMAGE)
+                ActionButton("Import plugin", onImportPlugin, Modifier.weight(1f), IconKind.STAR)
             }
             Spacer(Modifier.height(28.dp))
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -193,7 +193,7 @@ private fun ProjectCard(project: ProjectStore.ProjectInfo, onClick: () -> Unit, 
             Text("AUTOSAVED", color = Color(0xFF8C82C7), fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
         }
         Box(Modifier.size(42.dp).clickable(onClick = onDelete), contentAlignment = Alignment.Center) {
-            Text("⋯", color = KColors.Muted, fontSize = 23.sp)
+            Text("×", color = KColors.Danger, fontSize = 22.sp)
         }
     }
 }
