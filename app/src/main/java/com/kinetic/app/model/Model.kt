@@ -42,8 +42,8 @@ enum class EffectType(val label: String, val defaultAmount: Float) {
     CONTRAST("Contrast", 100f),
     SATURATION("Saturation", 100f),
     HUE("Hue", 0f),
-    GRAYSCALE("Grayscale", 100f),
-    INVERT("Invert", 100f)
+    GRAYSCALE("Grayscale", 0f),
+    INVERT("Invert", 0f)
 }
 
 data class LayerEffect(
