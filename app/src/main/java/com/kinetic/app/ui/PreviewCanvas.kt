@@ -30,12 +30,12 @@ import com.kinetic.app.model.PropId
 import com.kinetic.app.model.layerMatrix
 import android.graphics.Path as AndroidPath
 
-private fun makeLayerFilter(layer: com.kinetic.app.model.Layer): ColorMatrixColorFilter? {
+private fun makeLayerFilter(layer: com.kinetic.app.model.Layer, time: Float): ColorMatrixColorFilter? {
     val active = layer.effects.filter { it.enabled }
     if (active.isEmpty()) return null
     val combined = ColorMatrix()
     for (effect in active) {
-        val amount = effect.amount
+        val amount = effect.amountAt(time)
         val matrix = ColorMatrix()
         when (effect.type) {
             EffectType.BRIGHTNESS -> {
@@ -101,8 +101,8 @@ fun PreviewCanvas(editor: EditorState, modifier: Modifier = Modifier) {
             textAlign = Paint.Align.CENTER; textSize = 120f; typeface = Typeface.DEFAULT_BOLD
         }
     }
-    val filters = remember(editor.layers.map { it.id to it.effects }) {
-        editor.layers.associate { it.id to makeLayerFilter(it) }
+    val filters = remember(editor.layers.map { it.id to it.effects }, t) {
+        editor.layers.associate { it.id to makeLayerFilter(it, t) }
     }
     val outline = remember {
         Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; color = 0xFF8466FF.toInt() }
