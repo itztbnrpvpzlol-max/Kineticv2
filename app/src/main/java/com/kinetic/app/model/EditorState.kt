@@ -338,6 +338,28 @@ class EditorState(val settings: AppSettings, val projectId: String = UUID.random
         selectedKey = sorted.indexOf(moved)
     }
 
+    /** Move a graph key in time and value together without changing its interpolation handles. */
+    fun moveKey(layerId: String, id: PropId, index: Int, time: Float, value: Float) {
+        val layer = layers.firstOrNull { it.id == layerId } ?: return
+        val keys = layer.p(id).keys
+        if (index !in keys.indices) return
+        val previous = if (index > 0) keys[index - 1].t + frame else 0f
+        val next = if (index < keys.lastIndex) keys[index + 1].t - frame else duration
+        val v = if (id == PropId.OPACITY) value.coerceIn(0f, 100f) else value
+        val moved = keys[index].copy(t = time.coerceIn(previous, max(previous, next)), v = v)
+        val sorted = keys.toMutableList().also { it[index] = moved }.sortedBy { it.t }
+        updateLayer(layerId, push = false) { current ->
+            val updated = current.p(id).copy(keys = sorted)
+            var nextProps = current.props + (id to updated)
+            if (current.scaleLinked && (id == PropId.SCALE_X || id == PropId.SCALE_Y)) {
+                val other = if (id == PropId.SCALE_X) PropId.SCALE_Y else PropId.SCALE_X
+                nextProps = nextProps + (other to updated)
+            }
+            current.copy(props = nextProps)
+        }
+        selectedKey = sorted.indexOf(moved)
+    }
+
     fun setExpression(layerId: String, id: PropId, expression: String?) {
         updateLayer(layerId) { l -> l.copy(props = l.props + (id to l.p(id).copy(expression = expression))) }
     }
