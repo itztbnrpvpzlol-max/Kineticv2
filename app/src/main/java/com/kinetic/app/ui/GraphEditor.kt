@@ -248,13 +248,9 @@ fun GraphPanel(editor: EditorState, layer: Layer, modifier: Modifier = Modifier)
                         val y = change.position.y
                         when (mode) {
                             1 -> if (idx in ks.indices) {
-                                val prevT = if (idx > 0) ks[idx - 1].t + editor.frame / 2f else 0f
-                                val nextT = if (idx < ks.size - 1) ks[idx + 1].t - editor.frame / 2f else editor.duration
-                                // A value-graph point edits the value only. Retiming is performed
-                                // with the keyframe diamond in the timeline lane.
-                                var nv = g.v(y)
-                                if (s == PropId.OPACITY) nv = nv.coerceIn(0f, 100f)
-                                editor.replaceKey(l.id, s, idx, ks[idx].copy(v = nv), push = false)
+                                // Graph keyframes edit both dimensions; the model clamps time
+                                // between neighboring keys and preserves the Bezier handles.
+                                editor.moveKey(l.id, s, idx, g.t(x), g.v(y))
                             }
                             2, 3 -> if (idx in 0 until ks.size - 1) {
                                 val a = ks[idx]
