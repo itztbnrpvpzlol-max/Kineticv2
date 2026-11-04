@@ -224,6 +224,9 @@ fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> 
                         EffectControl(
                             editor = editor,
                             effect = effect,
+                            amount = effect.amountAt(editor.time),
+                            isKeyedAtTime = effect.keyframes.any { kotlin.math.abs(it.t - editor.time) <= 0.04f },
+                            onToggleKeyframe = { editor.toggleEffectKeyframe(layer.id, effect.id) },
                             onToggle = { editor.toggleEffect(layer.id, effect.id) },
                             onRemove = { editor.removeEffect(layer.id, effect.id) },
                             onMoveUp = { editor.moveEffect(layer.id, effect.id, -1) },
@@ -266,6 +269,9 @@ fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> 
 private fun EffectControl(
     editor: EditorState,
     effect: LayerEffect,
+    amount: Float,
+    isKeyedAtTime: Boolean,
+    onToggleKeyframe: () -> Unit,
     onToggle: () -> Unit,
     onRemove: () -> Unit,
     onMoveUp: () -> Unit,
@@ -291,13 +297,15 @@ private fun EffectControl(
                 modifier = Modifier.clickable(enabled = canMoveUp, onClick = onMoveUp).padding(horizontal = 5.dp, vertical = 4.dp))
             Text("↓", color = if (canMoveDown) KColors.Text else KColors.Dim, fontSize = 15.sp,
                 modifier = Modifier.clickable(enabled = canMoveDown, onClick = onMoveDown).padding(horizontal = 5.dp, vertical = 4.dp))
+            Text(if (isKeyedAtTime) "◆" else "◇", color = if (isKeyedAtTime) KColors.Accent else KColors.Muted, fontSize = 16.sp,
+                modifier = Modifier.clickable(onClick = onToggleKeyframe).padding(horizontal = 7.dp, vertical = 4.dp))
             Text(if (effect.enabled) "ON" else "OFF", color = if (effect.enabled) KColors.Accent else KColors.Dim, fontSize = 10.sp,
                 modifier = Modifier.clickable(onClick = onToggle).padding(horizontal = 8.dp, vertical = 6.dp))
             Text("×", color = KColors.Danger, fontSize = 18.sp, modifier = Modifier.clickable(onClick = onRemove).padding(horizontal = 5.dp))
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Slider(
-                value = effect.amount.coerceIn(range.start, range.endInclusive),
+                value = amount.coerceIn(range.start, range.endInclusive),
                 onValueChange = {
                     if (!editing) { editor.beginEdit(); editing = true }
                     onAmount(it)
@@ -307,7 +315,7 @@ private fun EffectControl(
                 enabled = effect.enabled,
                 modifier = Modifier.weight(1f).height(34.dp)
             )
-            Text(effect.amount.toInt().toString(), color = KColors.Muted, fontSize = 11.sp, modifier = Modifier.width(42.dp))
+            Text(amount.toInt().toString(), color = KColors.Muted, fontSize = 11.sp, modifier = Modifier.width(42.dp))
         }
     }
 }
