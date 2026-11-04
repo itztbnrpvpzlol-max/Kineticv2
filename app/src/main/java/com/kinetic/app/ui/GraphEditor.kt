@@ -105,6 +105,42 @@ private fun handlePts(keys: List<Keyframe>, i: Int): List<Pair<Float, Float>>? {
     return listOf((a.t + a.x1 * dt) to (a.v + a.y1 * dv), (a.t + a.x2 * dt) to (a.v + a.y2 * dv))
 }
 
+private fun hitBezierHandle(keys: List<Keyframe>, g: GMap, x: Float, y: Float, r: Float): Pair<Int, Int>? {
+    var best: Pair<Int, Int>? = null
+    var bestDistance = r
+    for (i in 0 until keys.lastIndex) {
+        val points = handlePts(keys, i) ?: continue
+        points.forEachIndexed { handle, point ->
+            val distance = hypot(g.x(point.first) - x, g.y(point.second) - y)
+            if (distance <= bestDistance) {
+                bestDistance = distance
+                best = i to handle
+            }
+        }
+    }
+    return best
+}
+
+private fun segmentSpeed(p: Prop, a: Keyframe, b: Keyframe, atEnd: Boolean): Float {
+    val dt = (b.t - a.t).coerceAtLeast(1e-4f)
+    val dv = abs(b.v - a.v)
+    if (a.type == KeyType.HOLD) return 0f
+    if (a.type == KeyType.LINEAR) return dv / dt
+    if (a.type == KeyType.BEZIER) {
+        val slope = if (atEnd) {
+            (1f - a.y2) / (1f - a.x2).coerceAtLeast(1e-3f)
+        } else {
+            a.y1 / a.x1.coerceAtLeast(1e-3f)
+        }
+        return dv / dt * abs(slope)
+    }
+    val epsilon = min(0.001f, dt / 100f).coerceAtLeast(1e-5f)
+    val t = if (atEnd) b.t else a.t
+    val t0 = if (atEnd) (t - epsilon).coerceAtLeast(a.t) else t
+    val t1 = if (atEnd) t else (t + epsilon).coerceAtMost(b.t)
+    return if (t1 > t0) abs(p.valueAt(t1) - p.valueAt(t0)) / (t1 - t0) else 0f
+}
+
 private fun hitKey(keys: List<Keyframe>, g: GMap, x: Float, y: Float, r: Float): Int {
     var best = -1
     var bd = r
@@ -179,15 +215,23 @@ fun GraphPanel(editor: EditorState, layer: Layer, modifier: Modifier = Modifier)
                             val g = gmap(size.width.toFloat(), size.height.toFloat(), editor.duration, latestRange, density)
                             mode = 0; idx = -1
                             if (!latestSpeed) {
-                                val seg = segIndex(editor.selectedKey, ks.size)
-                                val hp = if (seg >= 0) handlePts(ks, seg) else null
-                                if (hp != null) {
-                                    if (hypot(g.x(hp[0].first) - o.x, g.y(hp[0].second) - o.y) < hitR) { mode = 2; idx = seg }
-                                    else if (hypot(g.x(hp[1].first) - o.x, g.y(hp[1].second) - o.y) < hitR) { mode = 3; idx = seg }
-                                }
-                                if (mode == 0) {
+                                val handle = hitBezierHandle(ks, g, o.x, o.y, hitR)
+                                if (handle != null) {
+                                    idx = handle.first
+                                    mode = if (handle.second == 0) 2 else 3
+                                    editor.selectKey(s, idx, null)
+                                } else {
                                     val k = hitKey(ks, g, o.x, o.y, hitR)
                                     if (k >= 0) { mode = 1; idx = k; editor.selectKey(s, k, null) }
+                                }
+                            } else {
+                                for (i in 0 until ks.lastIndex) {
+                                    val a = ks[i]
+                                    val b = ks[i + 1]
+                                    val startPoint = Offset(g.x(a.t) - 5.dp.toPx(), g.y(segmentSpeed(latestLayer.p(latestSel), a, b, false)))
+                                    val endPoint = Offset(g.x(b.t) + 5.dp.toPx(), g.y(segmentSpeed(latestLayer.p(latestSel), a, b, true)))
+                                    if (hypot(startPoint.x - o.x, startPoint.y - o.y) <= hitR) { mode = 4; idx = i; break }
+                                    if (hypot(endPoint.x - o.x, endPoint.y - o.y) <= hitR) { mode = 5; idx = i; break }
                                 }
                             }
                             if (mode != 0) editor.beginEdit() else editor.seek(g.t(o.x))
@@ -217,11 +261,25 @@ fun GraphPanel(editor: EditorState, layer: Layer, modifier: Modifier = Modifier)
                                 val b = ks[idx + 1]
                                 val dt = max(b.t - a.t, 0.01f)
                                 val dv = b.v - a.v
-                                val tt = ((g.t(x) - a.t) / dt).coerceIn(0f, 1f)
+                                val tt = ((g.t(x) - a.t) / dt).coerceIn(0.001f, 0.999f)
                                 val vv = (if (abs(dv) > 1e-4f) (g.v(y) - a.v) / dv else 0f).coerceIn(-2f, 3f)
                                 val nk = if (mode == 2) a.copy(type = KeyType.BEZIER, x1 = tt, y1 = vv)
                                 else a.copy(type = KeyType.BEZIER, x2 = tt, y2 = vv)
                                 editor.replaceKey(l.id, s, idx, nk, push = false)
+                            }
+                            4, 5 -> if (idx in 0 until ks.size - 1) {
+                                val a = ks[idx]
+                                val b = ks[idx + 1]
+                                val baseSpeed = abs(b.v - a.v) / (b.t - a.t).coerceAtLeast(0.001f)
+                                if (baseSpeed > 1e-4f) {
+                                    val desiredSlope = (g.v(y).coerceAtLeast(0f) / baseSpeed).coerceIn(0f, 8f)
+                                    val nk = if (mode == 4) {
+                                        a.copy(type = KeyType.BEZIER, y1 = (desiredSlope * a.x1).coerceIn(-2f, 3f))
+                                    } else {
+                                        a.copy(type = KeyType.BEZIER, y2 = (1f - desiredSlope * (1f - a.x2)).coerceIn(-2f, 3f))
+                                    }
+                                    editor.replaceKey(l.id, s, idx, nk, push = false)
+                                }
                             }
                             else -> editor.seek(g.t(x))
                         }
@@ -255,11 +313,19 @@ fun GraphPanel(editor: EditorState, layer: Layer, modifier: Modifier = Modifier)
             drawPath(curve, KColors.Accent, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
 
             if (speed) {
-                for (k in keys) drawLine(Color(0x558466FF), Offset(g.x(k.t), g.padV), Offset(g.x(k.t), size.height - g.padV), 1.dp.toPx())
+                for (i in 0 until keys.lastIndex) {
+                    val a = keys[i]
+                    val b = keys[i + 1]
+                    val start = Offset(g.x(a.t) - 5.dp.toPx(), g.y(segmentSpeed(prop, a, b, false)))
+                    val end = Offset(g.x(b.t) + 5.dp.toPx(), g.y(segmentSpeed(prop, a, b, true)))
+                    drawLine(Color(0x558466FF), Offset(g.x(a.t), g.padV), Offset(g.x(a.t), size.height - g.padV), 1.dp.toPx())
+                    drawCircle(if (editor.selectedKey == i) Color.White else KColors.Accent, 6.dp.toPx(), start)
+                    drawCircle(if (editor.selectedKey == i + 1) Color.White else KColors.Accent, 6.dp.toPx(), end)
+                }
             } else {
-                val seg = segIndex(editor.selectedKey, keys.size)
-                val hp = if (seg >= 0) handlePts(keys, seg) else null
-                if (hp != null) {
+                val selectedSegments = listOf(editor.selectedKey - 1, editor.selectedKey).filter { it in 0 until keys.lastIndex }
+                for (seg in selectedSegments) {
+                    val hp = handlePts(keys, seg) ?: continue
                     val ka = keys[seg]
                     val kb = keys[seg + 1]
                     val o1 = Offset(g.x(hp[0].first), g.y(hp[0].second))
