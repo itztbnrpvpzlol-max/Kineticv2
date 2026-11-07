@@ -2,6 +2,9 @@ name: Build Aurea GLES shader patch
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
 
 permissions:
   contents: read
