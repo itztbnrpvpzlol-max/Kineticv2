@@ -9,6 +9,8 @@ import java.io.ByteArrayOutputStream;
 import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.widget.*;
 import android.text.InputType;
 import android.app.AlertDialog;
@@ -18,6 +20,17 @@ import java.nio.file.Files;
 public final class MainActivity extends Activity {
     private TextView reportView;
     private File reportFile;
+    private final Handler watcherHandler = new Handler(Looper.getMainLooper());
+    private final Runnable crashWatcher = new Runnable() {
+        @Override public void run() {
+            if (reportFile != null && reportFile.exists()) {
+                String current = readReport();
+                if (current.contains("PROBE_PROCESS_STARTED") && !current.contains("PROBE_COMPLETE")
+                        && !current.contains("JAVA_EXCEPTION") && !isProbeAlive()) showReport();
+            }
+            watcherHandler.postDelayed(this, 1500);
+        }
+    };
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         reportFile = new File(getFilesDir(), "aurea_native_probe.txt");
@@ -127,4 +140,5 @@ public final class MainActivity extends Activity {
         return false;
     }
     @Override protected void onResume(){ super.onResume(); if(reportView!=null && reportFile.exists())showReport(); }
+    @Override protected void onDestroy(){ watcherHandler.removeCallbacks(crashWatcher); super.onDestroy(); }
 }
