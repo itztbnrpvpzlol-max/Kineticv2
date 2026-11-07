@@ -23,10 +23,8 @@ jobs:
           if not archive.exists():
               sys.exit("Bug report ZIP not found at " + str(archive))
 
-          # Strong markers identify Aurea itself or a crash. Generic EGL/Mali
-          # mentions are only included from files that also mention Aurea.
           app_marker = re.compile(
-              r"com\\.aurea\\.aurea|P0005|libaurea(?:\\.so)?|AureaEngine|"
+              r"com\.aurea\.aurea|P0005|libaurea(?:\.so)?|AureaEngine|"
               r"GLES_COMPILE_BEGIN|shader nao compilou|Sem memoria para inicializar OpenGL ES|"
               r"pipelines basicos nao compilaram",
               re.IGNORECASE
@@ -57,7 +55,6 @@ jobs:
                   and "linkerconfig" not in i.filename.lower()
                   and "ld.config" not in i.filename.lower()
               ]
-              # Put likely runtime logs before general bugreport text.
               infos.sort(key=lambda i: (
                   0 if re.search(r"logcat|anr|tombstone|crash", i.filename, re.I) else 1,
                   i.filename.lower()
@@ -72,8 +69,6 @@ jobs:
 
                   app_hits = [n for n, line in enumerate(lines) if app_marker.search(line)]
                   crash_hits = [n for n, line in enumerate(lines) if crash_marker.search(line)]
-                  # Only trust generic graphics messages when the same file
-                  # contains a direct Aurea/P0005/native-library marker.
                   graphics_hits = (
                       [n for n, line in enumerate(lines) if graphics_marker.search(line)]
                       if app_hits else []
@@ -83,7 +78,7 @@ jobs:
                       continue
 
                   matched_files += 1
-                  output.append("\\n===== FILE: " + info.filename + " =====")
+                  output.append("\n===== FILE: " + info.filename + " =====")
                   selected = set()
                   for n in hits:
                       selected.update(range(max(0, n-3), min(len(lines), n+4)))
@@ -94,11 +89,11 @@ jobs:
                           output.append("... (context omitted) ...")
                       line = lines[n]
                       line = re.sub(
-                          r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}",
+                          r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}",
                           "[REDACTED_EMAIL]", line, flags=re.I
                       )
                       line = re.sub(
-                          r"(?<!\\d)(?:\\+?\\d[\\d .()-]{7,}\\d)(?!\\d)",
+                          r"(?<!\d)(?:\+?\d[\d .()-]{7,}\d)(?!\d)",
                           "[REDACTED_NUMBER]", line
                       )
                       output.append(f"{n+1}: {line[:1200]}")
@@ -109,14 +104,14 @@ jobs:
                   if len(output) >= 900:
                       break
 
-          report = "\\n".join(output) if output else (
+          report = "\n".join(output) if output else (
               "No Aurea-specific app, shader, or crash markers found in the scanned text/log files."
           )
           report = (
-              "Aurea bug-report diagnostic excerpts (filtered; not the full bug report)\\n"
-              f"Archive: {archive.name}\\n"
-              f"Text/log files scanned (linker config excluded): {scanned}\\n"
-              f"Files with relevant markers: {matched_files}\\n\\n" + report
+              "Aurea bug-report diagnostic excerpts (filtered; not the full bug report)\n"
+              f"Archive: {archive.name}\n"
+              f"Text/log files scanned (linker config excluded): {scanned}\n"
+              f"Files with relevant markers: {matched_files}\n\n" + report
           )
           pathlib.Path("aurea-diagnostic-excerpts.txt").write_text(report, encoding="utf-8")
           print(report[:20000])
