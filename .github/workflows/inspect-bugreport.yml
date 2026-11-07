@@ -2,6 +2,10 @@ name: Inspect Aurea Android bug report
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - 'bugreports/Aurea-V501L-bugreport.zip'
+      - '.github/workflows/inspect-bugreport.yml'
 
 permissions:
   contents: read
