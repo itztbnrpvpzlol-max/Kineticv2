@@ -32,6 +32,7 @@ fi
 
 python3 scripts/patch_aurea_shader_headers.py "$LIB"
 python3 scripts/patch_aurea_device_defaults.py "$DECODED/smali/er1.smali"
+python3 scripts/patch_aurea_font_fallback.py "$DECODED/smali/c01.smali"
 sha256sum "$LIB" | tee "$OUT/patched-libaurea-sha256.txt"
 
 java -jar "$APKTOOL" b "$DECODED" -o "$UNSIGNED"
