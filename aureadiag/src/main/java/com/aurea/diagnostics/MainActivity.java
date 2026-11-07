@@ -86,8 +86,8 @@ public class MainActivity extends Activity {
     }
 
     private class TestRenderer implements GLSurfaceView.Renderer {
-        @Override public void onSurfaceCreated(javax.microedition.khronos.egl.EGLConfig config,
-                                                javax.microedition.khronos.opengles.GL10 unused) {
+        @Override public void onSurfaceCreated(javax.microedition.khronos.opengles.GL10 unused,
+                                                javax.microedition.khronos.egl.EGLConfig config) {
             try {
                 String version = GLES30.glGetString(GLES30.GL_VERSION);
                 String vendor = GLES30.glGetString(GLES30.GL_VENDOR);
