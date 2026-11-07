@@ -1,0 +1,86 @@
+name: Inspect Aurea Android bug report
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Extract relevant graphics and crash diagnostics
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import zipfile, re, pathlib, sys
+
+          archive = pathlib.Path("bugreports/Aurea-V501L-bugreport.zip")
+          if not archive.exists():
+              sys.exit("Bug report ZIP not found at " + str(archive))
+
+          terms = re.compile(
+              r"com\\.aurea\\.aurea|P0005|GLES|EGL|OpenGL|Mali|shader|Vulkan|"
+              r"Fatal signal|SIGSEGV|AndroidRuntime|am_crash|FATAL EXCEPTION|"
+              r"libaurea|aurea",
+              re.IGNORECASE
+          )
+          output = []
+          scanned = 0
+          with zipfile.ZipFile(archive) as z:
+              for info in z.infolist():
+                  name = info.filename
+                  if info.is_dir() or info.file_size > 80 * 1024 * 1024:
+                      continue
+                  if not name.lower().endswith((".txt", ".log")):
+                      continue
+                  scanned += 1
+                  try:
+                      raw = z.read(info)
+                      text = raw.decode("utf-8", errors="replace")
+                  except Exception:
+                      continue
+                  lines = text.splitlines()
+                  hits = [i for i, line in enumerate(lines) if terms.search(line)]
+                  if not hits:
+                      continue
+                  output.append("\\n===== FILE: " + name + " =====")
+                  selected = set()
+                  for i in hits:
+                      selected.update(range(max(0, i-2), min(len(lines), i+3)))
+                  previous = -2
+                  for i in sorted(selected):
+                      if i > previous + 1:
+                          output.append("... (context omitted) ...")
+                      line = lines[i]
+                      # Redact common personal identifiers while retaining diagnostic content.
+                      line = re.sub(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}", "[REDACTED_EMAIL]", line, flags=re.I)
+                      line = re.sub(r"(?<!\\d)(?:\\+?\\d[\\d .()-]{7,}\\d)(?!\\d)", "[REDACTED_NUMBER]", line)
+                      output.append(f"{i+1}: {line[:1200]}")
+                      previous = i
+                      if len(output) > 1800:
+                          output.append("[TRUNCATED: excerpt limit reached]")
+                          break
+                  if len(output) > 1800:
+                      break
+
+          report = "\\n".join(output) if output else "No matching Aurea / graphics / crash lines found in scanned text logs."
+          report = (
+              "Aurea bug-report diagnostic excerpts (filtered; not the full bug report)\\n"
+              f"Archive: {archive.name}\\nText/log files scanned: {scanned}\\n\\n" + report
+          )
+          pathlib.Path("aurea-diagnostic-excerpts.txt").write_text(report, encoding="utf-8")
+          print(report[:12000])
+          PY
+
+      - name: Upload filtered diagnostic excerpts
+        uses: actions/upload-artifact@v4
+        with:
+          name: aurea-diagnostic-excerpts
+          path: aurea-diagnostic-excerpts.txt
+          if-no-files-found: error
+          retention-days: 7
