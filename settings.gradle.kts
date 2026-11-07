@@ -6,4 +6,4 @@ dependencyResolutionManagement {
     repositories { google(); mavenCentral() }
 }
 rootProject.name = "Kinetic"
-include(":app")
+include(":app", ":aureadiag")
