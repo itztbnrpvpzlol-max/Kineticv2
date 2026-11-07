@@ -43,7 +43,7 @@ jobs:
               r"pipelines basicos nao compilaram|EGL_BAD_ALLOC|EGL_NOT_INITIALIZED|"
               r"GL_OUT_OF_MEMORY|GL_INVALID_OPERATION|GL_INVALID_ENUM|GL_INVALID_VALUE|"
               r"shader.{0,40}(?:fail|error)|(?:compile|compil).{0,40}shader|"
-              r"OpenGL ES|GLES|EGL|Mali|AMediaCodec|MediaCodec|AureaExport|AureaEngine|decoder|encoder|export",
+              r"OpenGL ES|GLES|EGL|Mali|AMediaCodec|MediaCodec|AureaExport|AureaEngine|AureaCompat|AureaFonts|decoder|encoder|export",
               re.IGNORECASE
           )
 
