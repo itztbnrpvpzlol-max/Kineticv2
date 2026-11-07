@@ -10,6 +10,8 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.widget.*;
+import android.text.InputType;
+import android.app.AlertDialog;
 import java.io.File;
 import java.nio.file.Files;
 
@@ -28,6 +30,8 @@ public final class MainActivity extends Activity {
         intro.setText("Loads Aurea 0.4.7's real ARM native library and runs nativeCreate, nativeInitialize, startup diagnostics and shutdown in an isolated process. If native code crashes, this screen remains open with the last recorded stage.");
         intro.setTextColor(Color.LTGRAY); intro.setPadding(0,10,0,14); root.addView(intro);
         Button run = new Button(this); run.setText("RUN AUREA NATIVE ENGINE TEST"); root.addView(run);
+        Button github = new Button(this); github.setText("SET UP GITHUB AUTO-REPORTING"); root.addView(github);
+        github.setOnClickListener(v -> promptGitHubToken());
         Button refresh = new Button(this); refresh.setText("REFRESH REPORT"); root.addView(refresh);
         Button share = new Button(this); share.setText("SHARE REPORT"); root.addView(share);
         reportView = new TextView(this); reportView.setTextColor(Color.rgb(190,230,200)); reportView.setTextSize(12);
@@ -47,6 +51,30 @@ public final class MainActivity extends Activity {
             startActivity(Intent.createChooser(send,"Share native diagnostic report"));
         });
     }
+
+    private void promptGitHubToken() {
+        EditText token = new EditText(this);
+        token.setSingleLine(true);
+        token.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        token.setHint("Fine-grained GitHub token");
+        new AlertDialog.Builder(this)
+            .setTitle("Connect GitHub auto-reporting")
+            .setMessage("Create a fine-grained token for itztbnrpvpzlol-max/Kineticv2 with Issues: Read and write. Paste it here. Android Keystore encrypts it on this device; it is not included in the APK or diagnostic report.")
+            .setView(token)
+            .setNegativeButton("CANCEL", null)
+            .setPositiveButton("SAVE TOKEN", (dialog, which) -> {
+                String value = token.getText().toString().trim();
+                if (value.isEmpty()) { Toast.makeText(this, "Token was empty.", Toast.LENGTH_LONG).show(); return; }
+                try {
+                    GitHubReporter.saveToken(this, value);
+                    Toast.makeText(this, "GitHub connected. Failure reports will upload automatically.", Toast.LENGTH_LONG).show();
+                    if (reportFile.exists()) showReport();
+                } catch (Exception e) {
+                    Toast.makeText(this, "Could not securely save token: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                }
+            }).show();
+    }
+
     private String readReport() {
         try { return reportFile.exists() ? new String(Files.readAllBytes(reportFile.toPath()),java.nio.charset.StandardCharsets.UTF_8) : "No native report yet."; }
         catch(Exception e){ return "Report read error: "+e; }
@@ -57,7 +85,7 @@ public final class MainActivity extends Activity {
             body += "\n\nDIAGNOSIS: Isolated native process stopped unexpectedly before completion. Check the exit reason and native crash trace below; the last logged stage narrows down where it stopped.";
             body += collectNativeExitInfo();
         }
-        reportView.setText(body); return body;
+        reportView.setText(body); GitHubReporter.uploadIfFailure(this, body); return body;
     }
     private String collectNativeExitInfo() {
         if (Build.VERSION.SDK_INT < 30) return "\nProcess exit details require Android 11 or newer.";
