@@ -65,11 +65,19 @@ public final class GitHubReporter {
         return new String(cipher.doFinal(Arrays.copyOfRange(all, 12, all.length)), StandardCharsets.UTF_8);
     }
 
-    public static void uploadIfFailure(Context context, String report) {
-        if (report == null || !(report.contains("FAIL ") || report.contains("JAVA_EXCEPTION")
+    private static boolean isFailure(String report) {
+        return report != null && (report.contains("FAIL ") || report.contains("JAVA_EXCEPTION")
             || report.contains("DIAGNOSIS: Isolated native process stopped unexpectedly")
-            || report.contains("PROBE_COMPLETE initialized=false"))) return;
+            || report.contains("PROBE_COMPLETE initialized=false"));
+    }
+
+    public static void uploadIfFailure(Context context, String report) {
+        if (!isFailure(report)) return;
         EXECUTOR.execute(() -> upload(context.getApplicationContext(), report));
+    }
+
+    public static void uploadIfFailureBlocking(Context context, String report) {
+        if (isFailure(report)) upload(context.getApplicationContext(), report);
     }
 
     private static void upload(Context context, String report) {
