@@ -16,6 +16,7 @@ import android.os.Build;
 import android.view.Display;
 import com.aurea.aurea.engine.AureaEngine;
 import java.io.*;
+import java.nio.file.Files;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -161,7 +162,13 @@ public final class NativeProbeService extends Service {
         } catch (Throwable t) {
             log("JAVA_EXCEPTION " + t.getClass().getName() + ": " + t.getMessage());
             for (StackTraceElement e : t.getStackTrace()) log(" at " + e);
-        } finally { stopSelf(); }
+        } finally {
+            try {
+                if (report.exists()) GitHubReporter.uploadIfFailure(this,
+                    new String(Files.readAllBytes(report.toPath()), java.nio.charset.StandardCharsets.UTF_8));
+            } catch (Exception ignored) {}
+            stopSelf();
+        }
     }
     @Override public IBinder onBind(Intent intent) { return null; }
 }
