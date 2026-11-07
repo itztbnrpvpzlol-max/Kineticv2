@@ -6,8 +6,8 @@ android {
         applicationId = "com.aurea.diagnostics"
         minSdk = 26
         targetSdk = 28
-        versionCode = 2
-        versionName = "2.0-native"
+        versionCode = 3
+        versionName = "2.1-auto-report"
         ndk { abiFilters += "armeabi-v7a" }
     }
     sourceSets {
