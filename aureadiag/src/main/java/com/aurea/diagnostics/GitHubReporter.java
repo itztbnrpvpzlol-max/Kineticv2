@@ -89,7 +89,7 @@ public final class GitHubReporter {
             String signature = hex(MessageDigest.getInstance("SHA-256").digest(normalized.getBytes(StandardCharsets.UTF_8)));
             SharedPreferences prefs = context.getSharedPreferences("github_auto_report", Context.MODE_PRIVATE);
             if (signature.equals(prefs.getString("last_signature", ""))) return;
-            String safe = redact(report);
+            String safe = redact(report).replace(token, "[REDACTED_TOKEN]");
             if (safe.length() > 55000) safe = safe.substring(0, 55000) + "\n[Report truncated]";
             String model = Build.MANUFACTURER + " " + Build.MODEL;
             JSONObject payload = new JSONObject();
