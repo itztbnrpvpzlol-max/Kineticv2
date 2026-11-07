@@ -24,7 +24,7 @@ jobs:
               sys.exit("Bug report ZIP not found at " + str(archive))
 
           terms = re.compile(
-              r"com\\.aurea\\.aurea|P0005|GLES|EGL|OpenGL|Mali|shader|Vulkan|"
+              r"com\.aurea\.aurea|P0005|GLES|EGL|OpenGL|Mali|shader|Vulkan|"
               r"Fatal signal|SIGSEGV|AndroidRuntime|am_crash|FATAL EXCEPTION|"
               r"libaurea|aurea",
               re.IGNORECASE
@@ -48,7 +48,7 @@ jobs:
                   hits = [i for i, line in enumerate(lines) if terms.search(line)]
                   if not hits:
                       continue
-                  output.append("\\n===== FILE: " + name + " =====")
+                  output.append("\n===== FILE: " + name + " =====")
                   selected = set()
                   for i in hits:
                       selected.update(range(max(0, i-2), min(len(lines), i+3)))
@@ -58,8 +58,8 @@ jobs:
                           output.append("... (context omitted) ...")
                       line = lines[i]
                       # Redact common personal identifiers while retaining diagnostic content.
-                      line = re.sub(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}", "[REDACTED_EMAIL]", line, flags=re.I)
-                      line = re.sub(r"(?<!\\d)(?:\\+?\\d[\\d .()-]{7,}\\d)(?!\\d)", "[REDACTED_NUMBER]", line)
+                      line = re.sub(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", "[REDACTED_EMAIL]", line, flags=re.I)
+                      line = re.sub(r"(?<!\d)(?:\+?\d[\d .()-]{7,}\d)(?!\d)", "[REDACTED_NUMBER]", line)
                       output.append(f"{i+1}: {line[:1200]}")
                       previous = i
                       if len(output) > 1800:
@@ -68,10 +68,10 @@ jobs:
                   if len(output) > 1800:
                       break
 
-          report = "\\n".join(output) if output else "No matching Aurea / graphics / crash lines found in scanned text logs."
+          report = "\n".join(output) if output else "No matching Aurea / graphics / crash lines found in scanned text logs."
           report = (
-              "Aurea bug-report diagnostic excerpts (filtered; not the full bug report)\\n"
-              f"Archive: {archive.name}\\nText/log files scanned: {scanned}\\n\\n" + report
+              "Aurea bug-report diagnostic excerpts (filtered; not the full bug report)\n"
+              f"Archive: {archive.name}\nText/log files scanned: {scanned}\n\n" + report
           )
           pathlib.Path("aurea-diagnostic-excerpts.txt").write_text(report, encoding="utf-8")
           print(report[:12000])
