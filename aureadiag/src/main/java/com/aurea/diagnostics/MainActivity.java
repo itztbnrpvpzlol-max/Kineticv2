@@ -2,6 +2,10 @@ package com.aurea.diagnostics;
 
 import android.app.Activity;
 import android.app.ActivityManager;
+import android.app.ApplicationExitInfo;
+import android.os.Build;
+import java.io.InputStream;
+import java.io.ByteArrayOutputStream;
 import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
@@ -49,9 +53,43 @@ public final class MainActivity extends Activity {
     }
     private String showReport() {
         String body=readReport();
-        if(body.contains("NATIVE_INITIALIZE_CALL_STARTED") && !body.contains("PROBE_COMPLETE") && !isProbeAlive())
+        if(body.contains("NATIVE_INITIALIZE_CALL_STARTED") && !body.contains("PROBE_COMPLETE") && !isProbeAlive()) {
             body += "\n\nDIAGNOSIS: Isolated native process stopped before completion. This is consistent with a native crash during or after the last logged stage.";
+            body += collectNativeExitInfo();
+        }
         reportView.setText(body); return body;
+    }
+    private String collectNativeExitInfo() {
+        if (Build.VERSION.SDK_INT < 30) return "\nProcess exit details require Android 11 or newer.";
+        StringBuilder out = new StringBuilder("\n\nANDROID PROCESS EXIT DIAGNOSTICS");
+        try {
+            ActivityManager am=(ActivityManager)getSystemService(ACTIVITY_SERVICE);
+            if(am==null)return out.append("\nActivityManager unavailable.").toString();
+            for(ApplicationExitInfo info:am.getHistoricalProcessExitReasons(getPackageName(),0,12)) {
+                if(!(getPackageName()+":nativeprobe").equals(info.getProcessName())) continue;
+                out.append("\nreason=").append(info.getReason())
+                   .append(" status=").append(info.getStatus())
+                   .append(" description=").append(info.getDescription());
+                if(Build.VERSION.SDK_INT>=31) {
+                    try(InputStream in=info.getTraceInputStream()) {
+                        if(in!=null) {
+                            ByteArrayOutputStream bytes=new ByteArrayOutputStream();
+                            byte[] buffer=new byte[8192]; int n; int total=0;
+                            while((n=in.read(buffer))>0 && total<200000) {
+                                int take=Math.min(n,200000-total); bytes.write(buffer,0,take); total+=take;
+                            }
+                            out.append("\nNATIVE_CRASH_TRACE_BYTES=").append(total).append("\n")
+                               .append(bytes.toString(java.nio.charset.StandardCharsets.UTF_8));
+                        } else out.append("\nNo native crash trace supplied by Android.");
+                    } catch(Exception traceError) {
+                        out.append("\nTrace read error: ").append(traceError);
+                    }
+                }
+                return out.toString();
+            }
+            out.append("\nNo matching historical exit record found.");
+        } catch(Exception e) { out.append("\nExit diagnostics error: ").append(e); }
+        return out.toString();
     }
     private boolean isProbeAlive() {
         ActivityManager am=(ActivityManager)getSystemService(ACTIVITY_SERVICE);
