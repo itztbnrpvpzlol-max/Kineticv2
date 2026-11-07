@@ -56,7 +56,7 @@ public final class NativeProbeService extends Service {
             DisplayManager dm = (DisplayManager)getSystemService(DISPLAY_SERVICE);
             Display display = dm == null ? null : dm.getDisplay(Display.DEFAULT_DISPLAY);
             float hz = display == null ? 60f : display.getRefreshRate();
-            boolean debug = (getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
+            boolean debug = false; // Match the normal non-debug Aurea release configuration.
 
             log("LOADING_LIBAUREA");
             AureaEngine engine = new AureaEngine();
