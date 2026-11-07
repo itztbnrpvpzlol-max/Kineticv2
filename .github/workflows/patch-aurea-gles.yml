@@ -59,8 +59,15 @@ jobs:
           set -euo pipefail
           (
             cd work/unpacked
-            zip -X -q -r ../../output/Aurea-0.4.7-GLES-patched-unsigned.apk .
+            # Keep native libraries out of the normally compressed archive pass.
+            zip -X -q -r ../../output/Aurea-0.4.7-GLES-patched-unsigned.apk . -x 'lib/*'
+            # Store native .so files without compression for Android package compatibility.
+            zip -X -0 -q -r ../../output/Aurea-0.4.7-GLES-patched-unsigned.apk lib
           )
+
+          # Verify every native library is stored, not deflated.
+          unzip -lv output/Aurea-0.4.7-GLES-patched-unsigned.apk | \
+            awk '$NF ~ /^lib\/.*\.so$/ && $2 != "Stored" { print "Compressed native library: " $NF; bad=1 } END { exit bad }'
 
           zipalign -f -p 4 \
             output/Aurea-0.4.7-GLES-patched-unsigned.apk \
@@ -95,11 +102,12 @@ jobs:
             echo "- Moved each #version directive to line 1."
             echo "- Preserved each AUREA_SPIRV_FNV64 hash comment."
             echo "- Kept libaurea.so byte size unchanged."
+            echo "- Stored native libraries without compression."
             echo "- APK aligned and signed for installation."
             echo ""
             echo "**Important:** This APK is signed with a new test key. Android will not install it as an update over an existing copy signed with a different key. Back up any app data before uninstalling the existing app."
             echo ""
-            echo "Download the `aurea-gles-patched-apk` artifact below."
+            echo "Download the aurea-gles-patched-apk artifact below."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload patched APK
