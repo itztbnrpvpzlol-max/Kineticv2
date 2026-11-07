@@ -1,0 +1,113 @@
+name: Build Aurea GLES shader patch
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aurea-gles-patch
+  cancel-in-progress: false
+
+jobs:
+  patch:
+    name: Patch and sign Aurea APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install Android build tools
+        uses: android-actions/setup-android@v3
+
+      - name: Install zipalign and apksigner
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null
+          sdkmanager "build-tools;35.0.0"
+          echo "$ANDROID_HOME/build-tools/35.0.0" >> "$GITHUB_PATH"
+
+      - name: Decompress APK and patch shader headers
+        run: |
+          set -euo pipefail
+          mkdir -p work/original work/unpacked output
+          gzip -t apks/Aurea-0.4.7-32bits.apk.gz
+          gzip -dc apks/Aurea-0.4.7-32bits.apk.gz > work/original/Aurea-0.4.7.apk
+          unzip -q work/original/Aurea-0.4.7.apk -d work/unpacked
+
+          LIB="work/unpacked/lib/armeabi-v7a/libaurea.so"
+          if [[ ! -f "$LIB" ]]; then
+            echo "::error::Expected armeabi-v7a/libaurea.so was not found in the APK."
+            exit 1
+          fi
+
+          python3 scripts/patch_aurea_shader_headers.py "$LIB"
+          sha256sum "$LIB" | tee output/patched-libaurea-sha256.txt
+
+      - name: Repack, align, and sign APK
+        run: |
+          set -euo pipefail
+          (
+            cd work/unpacked
+            zip -X -q -r ../../output/Aurea-0.4.7-GLES-patched-unsigned.apk .
+          )
+
+          zipalign -f -p 4 \
+            output/Aurea-0.4.7-GLES-patched-unsigned.apk \
+            output/Aurea-0.4.7-GLES-patched-aligned.apk
+
+          keytool -genkeypair -v \
+            -keystore work/aurea-patch-debug.jks \
+            -storepass android \
+            -keypass android \
+            -alias aurea-patch \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Aurea GLES Compatibility Patch, OU=Android, O=Kineticv2, C=US"
+
+          apksigner sign \
+            --ks work/aurea-patch-debug.jks \
+            --ks-key-alias aurea-patch \
+            --ks-pass pass:android \
+            --key-pass pass:android \
+            --out output/Aurea-0.4.7-GLES-patched.apk \
+            output/Aurea-0.4.7-GLES-patched-aligned.apk
+
+          apksigner verify --verbose output/Aurea-0.4.7-GLES-patched.apk
+          sha256sum output/Aurea-0.4.7-GLES-patched.apk | tee output/apk-sha256.txt
+          rm -f output/*unsigned.apk output/*aligned.apk
+
+      - name: Write build summary
+        run: |
+          {
+            echo "## Aurea GLES shader patch built"
+            echo ""
+            echo "- Reordered 290 embedded GLSL shader headers."
+            echo "- Moved each #version directive to line 1."
+            echo "- Preserved each AUREA_SPIRV_FNV64 hash comment."
+            echo "- Kept libaurea.so byte size unchanged."
+            echo "- APK aligned and signed for installation."
+            echo ""
+            echo "**Important:** This APK is signed with a new test key. Android will not install it as an update over an existing copy signed with a different key. Back up any app data before uninstalling the existing app."
+            echo ""
+            echo "Download the `aurea-gles-patched-apk` artifact below."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload patched APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: aurea-gles-patched-apk
+          path: |
+            output/Aurea-0.4.7-GLES-patched.apk
+            output/apk-sha256.txt
+            output/patched-libaurea-sha256.txt
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
