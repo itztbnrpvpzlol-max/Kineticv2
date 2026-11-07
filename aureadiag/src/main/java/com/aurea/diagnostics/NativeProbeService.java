@@ -164,7 +164,7 @@ public final class NativeProbeService extends Service {
             for (StackTraceElement e : t.getStackTrace()) log(" at " + e);
         } finally {
             try {
-                if (report.exists()) GitHubReporter.uploadIfFailure(this,
+                if (report.exists()) GitHubReporter.uploadIfFailureBlocking(this,
                     new String(Files.readAllBytes(report.toPath()), java.nio.charset.StandardCharsets.UTF_8));
             } catch (Exception ignored) {}
             stopSelf();
