@@ -45,6 +45,7 @@ insert = """    # Explicitly register bundled fonts so text/glyph rendering has 
     iget-object v1, v5, Lsf1;->d:Lcom/aurea/aurea/engine/AureaEngine;
     invoke-static {v1, v2}, Lcom/aurea/aurea/engine/AureaEngine;->n(Lcom/aurea/aurea/engine/AureaEngine;Ljava/lang/String;)Ljava/lang/String;
     move-result-object v1
+    const/4 v1, 0x0
 """
 updated=text.replace(anchor,anchor+"\n"+insert.rstrip("\n"),1)
 if updated.count("NotoSansJP-Regular.otf") != 1 or updated.count("Roboto-Regular.ttf") != 1:
