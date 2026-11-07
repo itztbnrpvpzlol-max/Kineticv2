@@ -28,7 +28,7 @@ jobs:
               sys.exit("Bug report ZIP not found at " + str(archive))
 
           app_marker = re.compile(
-              r"com\.aurea\.aurea|P0005|libaurea(?:\.so)?|AureaEngine|"
+              r"com\.aurea\.aurea|com\.aurea\.editor|P0005|libaurea(?:\.so)?|AureaEngine|"
               r"GLES_COMPILE_BEGIN|shader nao compilou|Sem memoria para inicializar OpenGL ES|"
               r"pipelines basicos nao compilaram",
               re.IGNORECASE
@@ -43,7 +43,7 @@ jobs:
               r"pipelines basicos nao compilaram|EGL_BAD_ALLOC|EGL_NOT_INITIALIZED|"
               r"GL_OUT_OF_MEMORY|GL_INVALID_OPERATION|GL_INVALID_ENUM|GL_INVALID_VALUE|"
               r"shader.{0,40}(?:fail|error)|(?:compile|compil).{0,40}shader|"
-              r"OpenGL ES|GLES|EGL|Mali",
+              r"OpenGL ES|GLES|EGL|Mali|AMediaCodec|MediaCodec|AureaExport|AureaEngine|decoder|encoder|export",
               re.IGNORECASE
           )
 
@@ -75,7 +75,7 @@ jobs:
                   crash_hits = [n for n, line in enumerate(lines) if crash_marker.search(line)]
                   graphics_hits = (
                       [n for n, line in enumerate(lines) if graphics_marker.search(line)]
-                      if app_hits else []
+                      if app_hits or re.search(r"com\\.aurea\\.(?:editor|aurea)", info.filename, re.I) else []
                   )
                   hits = sorted(set(app_hits + crash_hits + graphics_hits))
                   if not hits:
@@ -100,7 +100,7 @@ jobs:
                           r"(?<!\d)(?:\+?\d[\d .()-]{7,}\d)(?!\d)",
                           "[REDACTED_NUMBER]", line
                       )
-                      output.append(f"{n+1}: {line[:1200]}")
+                      output.append(f"{n+1}: {line[:8000]}")
                       previous = n
                       if len(output) >= 900:
                           output.append("[TRUNCATED: excerpt limit reached]")
