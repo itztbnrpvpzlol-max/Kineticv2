@@ -53,8 +53,8 @@ public final class MainActivity extends Activity {
     }
     private String showReport() {
         String body=readReport();
-        if(body.contains("NATIVE_INITIALIZE_CALL_STARTED") && !body.contains("PROBE_COMPLETE") && !isProbeAlive()) {
-            body += "\n\nDIAGNOSIS: Isolated native process stopped before completion. This is consistent with a native crash during or after the last logged stage.";
+        if(body.contains("PROBE_PROCESS_STARTED") && !body.contains("PROBE_COMPLETE") && !body.contains("JAVA_EXCEPTION") && !isProbeAlive()) {
+            body += "\n\nDIAGNOSIS: Isolated native process stopped unexpectedly before completion. Check the exit reason and native crash trace below; the last logged stage narrows down where it stopped.";
             body += collectNativeExitInfo();
         }
         reportView.setText(body); return body;
