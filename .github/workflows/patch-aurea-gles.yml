@@ -11,10 +11,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  patch:
-    name: Patch and sign Aurea APK
+  build:
+    name: Gradle APK rebuild
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -24,6 +24,11 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.7"
 
       - name: Install Android build tools
         uses: android-actions/setup-android@v3
@@ -37,87 +42,37 @@ jobs:
           sdkmanager "build-tools;35.0.0"
           echo "$ANDROID_HOME/build-tools/35.0.0" >> "$GITHUB_PATH"
 
-      - name: Decompress APK and patch shader headers
+      - name: Build with Gradle
+        run: gradle --no-daemon clean buildPatchedApk
+
+      - name: Inspect APK package metadata
         run: |
           set -euo pipefail
-          mkdir -p work/original work/unpacked output
-          gzip -t apks/Aurea-0.4.7-32bits.apk.gz
-          gzip -dc apks/Aurea-0.4.7-32bits.apk.gz > work/original/Aurea-0.4.7.apk
-          unzip -q work/original/Aurea-0.4.7.apk -d work/unpacked
-
-          LIB="work/unpacked/lib/armeabi-v7a/libaurea.so"
-          if [[ ! -f "$LIB" ]]; then
-            echo "::error::Expected armeabi-v7a/libaurea.so was not found in the APK."
-            exit 1
-          fi
-
-          python3 scripts/patch_aurea_shader_headers.py "$LIB"
-          sha256sum "$LIB" | tee output/patched-libaurea-sha256.txt
-
-      - name: Repack, align, and sign APK
-        run: |
-          set -euo pipefail
-          (
-            cd work/unpacked
-            # Keep native libraries out of the normally compressed archive pass.
-            zip -X -q -r ../../output/Aurea-0.4.7-GLES-patched-unsigned.apk . -x 'lib/*'
-            # Store native .so files without compression for Android package compatibility.
-            zip -X -0 -q -r ../../output/Aurea-0.4.7-GLES-patched-unsigned.apk lib
-          )
-
-          # Verify every native library is stored, not deflated.
-          unzip -lv output/Aurea-0.4.7-GLES-patched-unsigned.apk | \
-            awk '$NF ~ /^lib\/.*\.so$/ && $2 != "Stored" { print "Compressed native library: " $NF; bad=1 } END { exit bad }'
-
-          zipalign -f -p 4 \
-            output/Aurea-0.4.7-GLES-patched-unsigned.apk \
-            output/Aurea-0.4.7-GLES-patched-aligned.apk
-
-          keytool -genkeypair -v \
-            -keystore work/aurea-patch-debug.jks \
-            -storepass android \
-            -keypass android \
-            -alias aurea-patch \
-            -keyalg RSA -keysize 2048 -validity 10000 \
-            -dname "CN=Aurea GLES Compatibility Patch, OU=Android, O=Kineticv2, C=US"
-
-          apksigner sign \
-            --ks work/aurea-patch-debug.jks \
-            --ks-key-alias aurea-patch \
-            --ks-pass pass:android \
-            --key-pass pass:android \
-            --out output/Aurea-0.4.7-GLES-patched.apk \
-            output/Aurea-0.4.7-GLES-patched-aligned.apk
-
-          apksigner verify --verbose output/Aurea-0.4.7-GLES-patched.apk
-          sha256sum output/Aurea-0.4.7-GLES-patched.apk | tee output/apk-sha256.txt
-          rm -f output/*unsigned.apk output/*aligned.apk
+          aapt dump badging build/outputs/apk/Aurea-0.4.7-GLES-patched.apk | head -n 8
+          unzip -t build/outputs/apk/Aurea-0.4.7-GLES-patched.apk | tail -n 2
+          unzip -lv build/outputs/apk/Aurea-0.4.7-GLES-patched.apk | awk '$NF ~ /^lib\/.*\.so$/ && $2 != "Stored" { print "Compressed native library: " $NF; bad=1 } END { exit bad }'
 
       - name: Write build summary
         run: |
           {
-            echo "## Aurea GLES shader patch built"
+            echo "## Aurea GLES Gradle rebuild"
             echo ""
-            echo "- Reordered 290 embedded GLSL shader headers."
-            echo "- Moved each #version directive to line 1."
-            echo "- Preserved each AUREA_SPIRV_FNV64 hash comment."
-            echo "- Kept libaurea.so byte size unchanged."
-            echo "- Stored native libraries without compression."
-            echo "- APK aligned and signed for installation."
+            echo "- Gradle 8.7 runs the build task."
+            echo "- Apktool decodes and rebuilds the original APK resources and manifest."
+            echo "- Patched 290 embedded shader headers in libaurea.so."
+            echo "- Native libraries are stored uncompressed; APK is zip-aligned and signed."
             echo ""
-            echo "**Important:** This APK is signed with a new test key. Android will not install it as an update over an existing copy signed with a different key. Back up any app data before uninstalling the existing app."
-            echo ""
-            echo "Download the aurea-gles-patched-apk artifact below."
+            echo "**Note:** The build uses a newly generated signing key. It cannot update an install signed with Aurea's original private key."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload patched APK
         uses: actions/upload-artifact@v4
         with:
-          name: aurea-gles-patched-apk
+          name: aurea-gles-gradle-apk
           path: |
-            output/Aurea-0.4.7-GLES-patched.apk
-            output/apk-sha256.txt
-            output/patched-libaurea-sha256.txt
+            build/outputs/apk/Aurea-0.4.7-GLES-patched.apk
+            build/outputs/apk/apk-sha256.txt
+            build/outputs/apk/patched-libaurea-sha256.txt
           if-no-files-found: error
           compression-level: 0
           retention-days: 14
