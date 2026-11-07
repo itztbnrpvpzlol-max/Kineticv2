@@ -45,6 +45,21 @@ insert = """    # Explicitly register bundled fonts so text/glyph rendering has 
     iget-object v1, v5, Lsf1;->d:Lcom/aurea/aurea/engine/AureaEngine;
     invoke-static {v1, v2}, Lcom/aurea/aurea/engine/AureaEngine;->n(Lcom/aurea/aurea/engine/AureaEngine;Ljava/lang/String;)Ljava/lang/String;
     move-result-object v1
+
+    # Emit the engine's actual font registry and startup status for device diagnostics.
+    iget-object v1, v5, Lsf1;->d:Lcom/aurea/aurea/engine/AureaEngine;
+    invoke-static {v1}, Lcom/aurea/aurea/engine/AureaEngine;->C0(Lcom/aurea/aurea/engine/AureaEngine;)Ljava/lang/String;
+    move-result-object v1
+    const-string v2, "AureaCompat"
+    invoke-static {v2, v1}, Landroid/util/Log;->i(Ljava/lang/String;Ljava/lang/String;)I
+    move-result v1
+
+    iget-object v1, v5, Lsf1;->d:Lcom/aurea/aurea/engine/AureaEngine;
+    invoke-virtual {v1}, Lcom/aurea/aurea/engine/AureaEngine;->y8()Ljava/lang/String;
+    move-result-object v1
+    const-string v2, "AureaCompat"
+    invoke-static {v2, v1}, Landroid/util/Log;->i(Ljava/lang/String;Ljava/lang/String;)I
+    move-result v1
     const/4 v1, 0x0
 """
 updated=text.replace(anchor,anchor+"\n"+insert.rstrip("\n"),1)
