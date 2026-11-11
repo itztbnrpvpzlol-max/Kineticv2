@@ -43,6 +43,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Slider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -94,6 +95,7 @@ fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> 
     var previewExpanded by remember { mutableStateOf(false) }
     var previewHeight by remember { mutableFloatStateOf(210f) }
     var dockTool by remember { mutableStateOf("Select") }
+    var showToolSheet by remember { mutableStateOf(false) }
 
     fun leave() { if (editor.layers.isEmpty()) onExit() else showLeave = true }
     BackHandler { leave() }
@@ -103,6 +105,7 @@ fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> 
     DisposableEffect(Unit) { onDispose { audio.release(); MediaLoader.releaseAll() } }
     val projectStore = remember { ProjectStore(ctx) }
     LaunchedEffect(editor.settings.previewMemoryMb) { MediaLoader.configureCache(editor.settings.previewMemoryMb) }
+    LaunchedEffect(editor.layers.map { it.id to it.uri }) { audio.prepare(editor.layers) }
 
     LaunchedEffect(editor.layers, editor.duration, editor.resolution, editor.projectName) {
         delay(400)
@@ -198,6 +201,10 @@ fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> 
                     "Select" -> editor.select(null)
                     "Properties" -> if (activeLayer != null) panelTab = 0
                     "Graph" -> if (activeLayer != null) panelTab = 1
+                    "Speed", "Volume", "Extract audio", "Masking", "Effects", "Blending", "Blend modes" -> {
+                        if (activeLayer != null) showToolSheet = true
+                        else Toast.makeText(ctx, "Select a layer first", Toast.LENGTH_SHORT).show()
+                    }
                     "Text" -> editor.addText()
                     "Shapes" -> editor.addShape()
                     "Layers" -> showLayers = true
@@ -208,6 +215,20 @@ fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> 
         }
     }
 
+    if (showToolSheet && editor.selected != null) {
+        val target = editor.selected!!
+        ModalBottomSheet(
+            onDismissRequest = { showToolSheet = false },
+            containerColor = KColors.Surface,
+            dragHandle = { Box(Modifier.padding(vertical = 8.dp).size(width = 42.dp, height = 4.dp).clip(CircleShape).background(KColors.Muted)) }
+        ) {
+            DockToolControls(
+                tool = dockTool, editor = editor, layer = target,
+                onClose = { showToolSheet = false },
+                onExtractAudio = { editor.extractAudio(target.id); showToolSheet = false }
+            )
+        }
+    }
     if (showImport) {
         ActionDialog("Import media", { showImport = false }) {
             DialogItem("Video") { showImport = false; pickVideo.launch(arrayOf("video/*")) }
@@ -315,6 +336,53 @@ private fun UnifiedEditingDock(active: String, onSelect: (String) -> Unit) {
         }
     }
 }
+@Composable
+private fun DockToolControls(
+    tool: String, editor: EditorState, layer: Layer,
+    onClose: () -> Unit, onExtractAudio: () -> Unit
+) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp)) {
+        Text(tool, color = KColors.Text, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(12.dp))
+        when (tool) {
+            "Speed" -> {
+                Text("Playback speed  ·  ${String.format("%.2f×", layer.speed)}", color = KColors.Text, fontSize = 14.sp)
+                Slider(value = layer.speed, onValueChange = { v -> editor.updateLayer(layer.id, push = false) { it.copy(speed = v) } }, valueRange = 0.1f..4f)
+                Text("Applies to video preview and linked audio playback.", color = KColors.Muted, fontSize = 12.sp)
+            }
+            "Volume" -> {
+                Text("Clip volume  ·  ${(layer.volume * 100).toInt()}%", color = KColors.Text, fontSize = 14.sp)
+                Slider(value = layer.volume, onValueChange = { v -> editor.updateLayer(layer.id, push = false) { it.copy(volume = v) } }, valueRange = 0f..2f)
+                Text("Audio layers use this level during playback.", color = KColors.Muted, fontSize = 12.sp)
+            }
+            "Extract audio" -> {
+                Text(if (layer.type == LayerType.VIDEO) "Create a linked audio layer using this video's audio track." else "Select a video layer to extract its audio.", color = KColors.Muted, fontSize = 13.sp)
+                DialogItem("Extract audio from video") { if (layer.type == LayerType.VIDEO) onExtractAudio() }
+            }
+            "Masking" -> {
+                Text("Rectangular layer mask", color = KColors.Text, fontSize = 14.sp)
+                SwitchRow("Enable mask (80% frame)", layer.maskEnabled) { v -> editor.updateLayer(layer.id) { it.copy(maskEnabled = v) } }
+            }
+            "Effects" -> {
+                Text("Basic preview effect", color = KColors.Text, fontSize = 14.sp)
+                SwitchRow("Grayscale", "Grayscale" in layer.effects) { enabled ->
+                    editor.updateLayer(layer.id) { it.copy(effects = if (enabled) it.effects + "Grayscale" else it.effects - "Grayscale") }
+                }
+            }
+            "Blending", "Blend modes" -> {
+                Text("Layer blend mode", color = KColors.Text, fontSize = 14.sp)
+                listOf("Normal", "Multiply", "Screen", "Add").forEach { mode ->
+                    DialogItem((if (layer.blendMode == mode) "✓  " else "") + mode) {
+                        editor.updateLayer(layer.id) { it.copy(blendMode = mode) }
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        TextButton(onClick = onClose) { Text("Done", color = KColors.Accent) }
+    }
+}
+
 @Composable
 private fun ResizeHandle(density: Float, onHeight: (Float) -> Unit) {
     var current by remember { mutableFloatStateOf(210f) }

@@ -21,6 +21,16 @@ class AudioEngine(context: Context) {
     private val players = HashMap<String, ExoPlayer>()
     private var released = false
 
+    fun prepare(layers: List<Layer>) {
+        if (released) return
+        for (layer in layers) {
+            val uri = layer.uri ?: continue
+            if (layer.type != LayerType.AUDIO && layer.type != LayerType.VIDEO) continue
+            if (players.containsKey(layer.id)) continue
+            players[layer.id] = createPlayer(uri)
+        }
+    }
+
     fun sync(layers: List<Layer>, time: Float, playing: Boolean) {
         if (released) return
 
