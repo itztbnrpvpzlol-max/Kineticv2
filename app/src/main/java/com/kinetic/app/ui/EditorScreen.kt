@@ -56,6 +56,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -77,6 +78,7 @@ import kotlinx.coroutines.withContext
 @OptIn(ExperimentalMaterial3Api::class)
 fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> Unit) {
     val ctx = LocalContext.current
+    val density = LocalDensity.current.density
     val scope = rememberCoroutineScope()
     var showImport by remember { mutableStateOf(false) }
     var showLayers by remember { mutableStateOf(false) }
@@ -85,9 +87,11 @@ fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> 
     var panelTab by remember { mutableIntStateOf(0) }
     var renameTarget by remember { mutableStateOf<Layer?>(null) }
     var parentPicker by remember { mutableStateOf(false) }
+    var previewExpanded by remember { mutableStateOf(false) }
 
     fun leave() { if (editor.layers.isEmpty()) onExit() else showLeave = true }
     BackHandler { leave() }
+    BackHandler(enabled = previewExpanded) { previewExpanded = false }
 
     val audio = remember { AudioEngine(ctx) }
     DisposableEffect(Unit) { onDispose { audio.release(); MediaLoader.releaseAll() } }
@@ -159,29 +163,35 @@ fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> 
             editor.playing = false; onOpenSettings()
         }, onExport = { Toast.makeText(ctx, "Export isn't built yet", Toast.LENGTH_SHORT).show() })
 
-        PreviewCanvas(editor, Modifier.fillMaxWidth().aspectRatio(16f / 9f))
-        PreviewToolsBar(editor, onAddLayer = { showLayers = true })
-        TimelinePane(editor, Modifier.weight(1f))
-        editor.selected?.let { activeLayer ->
-            Box(Modifier.fillMaxWidth().height(9.dp).background(KColors.Bg).pointerInput(activeLayer.id) {
-                detectVerticalDragGestures { change, drag -> change.consume(); panelHeight = (panelHeight - drag / density).coerceIn(130f, 360f) }
-            }, contentAlignment = Alignment.Center) {
-                Box(Modifier.width(42.dp).height(4.dp).clip(CircleShape).background(KColors.Muted))
-            }
-            EditPanel(editor, activeLayer, panelTab, { panelTab = it }, { editor.select(null) },
-                onRename = { renameTarget = activeLayer },
-                onParent = { parentPicker = true },
-                modifier = Modifier.fillMaxWidth().height(panelHeight.dp))
+        if (previewExpanded) {
+            PreviewCanvas(editor, Modifier.weight(1f).fillMaxWidth())
+        } else {
+            PreviewCanvas(editor, Modifier.fillMaxWidth().aspectRatio(16f / 9f))
         }
+        PreviewToolsBar(editor, onAddLayer = { showLayers = true }, onTogglePreview = { previewExpanded = !previewExpanded })
+        if (!previewExpanded) {
+            TimelinePane(editor, Modifier.weight(1f))
+            editor.selected?.let { activeLayer ->
+                Box(Modifier.fillMaxWidth().height(9.dp).background(KColors.Bg).pointerInput(activeLayer.id) {
+                    detectVerticalDragGestures { change, drag -> change.consume(); panelHeight = (panelHeight - drag / density).coerceIn(130f, 360f) }
+                }, contentAlignment = Alignment.Center) {
+                    Box(Modifier.width(42.dp).height(4.dp).clip(CircleShape).background(KColors.Muted))
+                }
+                EditPanel(editor, activeLayer, panelTab, { panelTab = it }, { editor.select(null) },
+                    onRename = { renameTarget = activeLayer },
+                    onParent = { parentPicker = true },
+                    modifier = Modifier.fillMaxWidth().height(panelHeight.dp))
+            }
 
-        BottomToolbar(
-            onSelect = { editor.select(null) },
-            onText = { editor.addText() },
-            onShapes = { editor.addShape() },
-            onLayers = { showLayers = true },
-            onAdjust = { editor.addAdjustment() },
-            onAdd = { showImport = true }
-        )
+            BottomToolbar(
+                onSelect = { editor.select(null) },
+                onText = { editor.addText() },
+                onShapes = { editor.addShape() },
+                onLayers = { showLayers = true },
+                onAdjust = { editor.addAdjustment() },
+                onAdd = { showImport = true }
+            )
+        }
     }
 
     if (showImport) {
@@ -275,7 +285,7 @@ private fun TopBar(editor: EditorState, onMenuHome: () -> Unit, onOpenSettings: 
 }
 
 @Composable
-private fun PreviewToolsBar(editor: EditorState, onAddLayer: () -> Unit) {
+private fun PreviewToolsBar(editor: EditorState, onAddLayer: () -> Unit, onTogglePreview: () -> Unit) {
     Row(Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceEvenly) {
         PreviewTool(IconKind.UNDO, editor.canUndo) { editor.undo() }
         PreviewTool(IconKind.REDO, editor.canRedo) { editor.redo() }
@@ -283,7 +293,7 @@ private fun PreviewToolsBar(editor: EditorState, onAddLayer: () -> Unit) {
         PreviewTool(if (editor.playing) IconKind.PAUSE else IconKind.PLAY) { editor.playing = !editor.playing }
         PreviewTool(IconKind.NEXT) { editor.playing = false; editor.seek(editor.duration) }
         PreviewTool(IconKind.PLUS, onClick = onAddLayer)
-        PreviewTool(IconKind.FIT) { }
+        PreviewTool(if (editor.playing) IconKind.FIT else IconKind.FULLSCREEN, onClick = onTogglePreview)
     }
 }
 
