@@ -1,85 +1,100 @@
 package com.kinetic.app.data
 
 import android.content.Context
-import android.media.MediaPlayer
 import android.net.Uri
+import androidx.media3.common.C
+import androidx.media3.common.MediaItem
+import androidx.media3.common.TrackSelectionParameters
+import androidx.media3.exoplayer.ExoPlayer
 import com.kinetic.app.model.Layer
 import com.kinetic.app.model.LayerType
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import kotlin.math.abs
 
-class AudioEngine(private val ctx: Context, private val scope: CoroutineScope) {
-    private val players = HashMap<String, MediaPlayer>()
-    private val pending = HashSet<String>()
+/**
+ * Timeline-aware audio transport.
+ *
+ * ExoPlayer owns decoding and buffering. The editor only changes the requested
+ * transport position when a clip starts or when drift becomes large; it does
+ * not issue a seek on every UI frame.
+ */
+class AudioEngine(context: Context) {
+    private val appContext = context.applicationContext
+    private val players = HashMap<String, ExoPlayer>()
     private var released = false
 
     fun sync(layers: List<Layer>, time: Float, playing: Boolean) {
         if (released) return
-        val ids = HashSet<String>()
-        for (l in layers) {
-            val u = l.uri ?: continue
-            if (l.type != LayerType.AUDIO && l.type != LayerType.VIDEO) continue
-            ids.add(l.id)
-            val want = playing && l.visible && l.activeAt(time)
-            val p = players[l.id]
-            if (p == null) {
-                if (want && pending.add(l.id)) load(l.id, u)
+
+        val activeIds = HashSet<String>()
+        for (layer in layers) {
+            val uri = layer.uri ?: continue
+            if (layer.type != LayerType.AUDIO && layer.type != LayerType.VIDEO) continue
+            activeIds.add(layer.id)
+
+            val shouldPlay = playing && layer.visible && layer.activeAt(time)
+            var player = players[layer.id]
+            if (player == null && shouldPlay) {
+                player = createPlayer(uri)
+                players[layer.id] = player
+                player.seekTo(sourcePositionMs(layer, time))
+                player.playWhenReady = true
                 continue
             }
-            try {
-                if (!want) {
-                    if (p.isPlaying) p.pause()
-                } else {
-                    val pos = ((time - l.start + l.srcOffset) * 1000f).toInt().coerceAtLeast(0)
-                    if (!p.isPlaying) {
-                        p.seekTo(pos)
-                        p.start()
-                    } else if (abs(p.currentPosition - pos) > 300) {
-                        p.seekTo(pos)
-                    }
-                }
-            } catch (_: Exception) {
+            if (player == null) continue
+
+            if (!shouldPlay) {
+                if (player.playWhenReady) player.playWhenReady = false
+                continue
+            }
+
+            val targetMs = sourcePositionMs(layer, time)
+            if (!player.playWhenReady) {
+                // Resume without an unconditional seek. ExoPlayer retains its decoder
+                // and buffered data while the clip is temporarily outside the playhead.
+                player.playWhenReady = true
+            }
+            val currentMs = player.currentPosition
+            if (player.playbackState == androidx.media3.common.Player.STATE_READY &&
+                kotlin.math.abs(currentMs - targetMs) > DRIFT_CORRECTION_MS
+            ) {
+                player.seekTo(targetMs)
             }
         }
-        val iter = players.entries.iterator()
-        while (iter.hasNext()) {
-            val e = iter.next()
-            if (e.key !in ids) {
-                try { e.value.release() } catch (_: Exception) { }
-                iter.remove()
-            }
+
+        val stale = players.keys.filter { it !in activeIds }
+        for (id in stale) {
+            players.remove(id)?.release()
         }
     }
 
-    private fun load(id: String, uri: String) {
-        scope.launch {
-            val mp = withContext(Dispatchers.IO) {
-                try {
-                    MediaPlayer().apply { setDataSource(ctx, Uri.parse(uri)); prepare() }
-                } catch (e: Exception) {
-                    null
-                }
-            }
-            pending.remove(id)
-            if (mp == null) return@launch
-            if (released) mp.release() else players[id] = mp
+    private fun createPlayer(uri: String): ExoPlayer {
+        return ExoPlayer.Builder(appContext).build().apply {
+            trackSelectionParameters = TrackSelectionParameters.Builder(appContext)
+                .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, true)
+                .build()
+            setMediaItem(MediaItem.fromUri(Uri.parse(uri)))
+            repeatMode = androidx.media3.common.Player.REPEAT_MODE_OFF
+            volume = 1f
+            prepare()
         }
     }
+
+    private fun sourcePositionMs(layer: Layer, time: Float): Long =
+        (((time - layer.start + layer.srcOffset).coerceAtLeast(0f)) * 1000f).toLong()
 
     fun pauseAll() {
-        for (p in players.values) {
-            try { if (p.isPlaying) p.pause() } catch (_: Exception) { }
+        for (player in players.values) {
+            player.playWhenReady = false
         }
     }
 
     fun release() {
+        if (released) return
         released = true
-        for (p in players.values) {
-            try { p.release() } catch (_: Exception) { }
-        }
+        for (player in players.values) player.release()
         players.clear()
+    }
+
+    companion object {
+        private const val DRIFT_CORRECTION_MS = 750L
     }
 }
