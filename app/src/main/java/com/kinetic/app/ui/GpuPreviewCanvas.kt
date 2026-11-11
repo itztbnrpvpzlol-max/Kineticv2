@@ -265,8 +265,8 @@ private class CompositionGlRenderer(private val onGpuFailure: () -> Unit) : GLSu
         when (layer.blend) {
             "Multiply" -> GLES20.glBlendFunc(GLES20.GL_DST_COLOR, GLES20.GL_ONE_MINUS_SRC_ALPHA)
             "Screen" -> GLES20.glBlendFunc(GLES20.GL_ONE, GLES20.GL_ONE_MINUS_SRC_COLOR)
-            "Add" -> GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE)
-            else -> GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
+            "Add" -> GLES20.glBlendFunc(GLES20.GL_ONE, GLES20.GL_ONE)
+            else -> GLES20.glBlendFunc(GLES20.GL_ONE, GLES20.GL_ONE_MINUS_SRC_ALPHA)
         }
         GLES20.glEnable(GLES20.GL_BLEND)
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
@@ -348,7 +348,7 @@ private class CompositionGlRenderer(private val onGpuFailure: () -> Unit) : GLSu
 
     companion object {
         private const val VERTEX_SHADER = "attribute vec2 aPosition; attribute vec2 aTexCoord; varying vec2 vTexCoord; void main(){ gl_Position=vec4(aPosition,0.0,1.0); vTexCoord=aTexCoord; }"
-        private const val TEXTURE_SHADER = "precision mediump float; uniform sampler2D uTexture; uniform float uAlpha; uniform float uGray; varying vec2 vTexCoord; void main(){ vec4 c=texture2D(uTexture,vTexCoord); if(uGray>0.5){ float y=dot(c.rgb,vec3(0.299,0.587,0.114)); c.rgb=vec3(y); } gl_FragColor=vec4(c.rgb,c.a*uAlpha); }"
+        private const val TEXTURE_SHADER = "precision mediump float; uniform sampler2D uTexture; uniform float uAlpha; uniform float uGray; varying vec2 vTexCoord; void main(){ vec4 c=texture2D(uTexture,vTexCoord); if(uGray>0.5){ float y=dot(c.rgb,vec3(0.299,0.587,0.114)); c.rgb=vec3(y); } gl_FragColor=vec4(c.rgb*uAlpha,c.a*uAlpha); }"
         private const val SOLID_SHADER = "precision mediump float; uniform vec4 uColor; void main(){ gl_FragColor=uColor; }"
     }
 }
