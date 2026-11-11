@@ -11,7 +11,8 @@ import android.graphics.Typeface
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.opengl.GLUtils
-import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.view.View
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -135,11 +136,12 @@ fun PreviewCanvas(editor: EditorState, modifier: Modifier = Modifier) {
         )
     }
     val scene = GpuScene(renderLayers, selectedLayer)
+    val gpuFailed = remember { androidx.compose.runtime.mutableStateOf(false) }
 
-    if (!supportsGles2(context)) {
+    if (gpuFailed.value || !supportsGles2(context)) {
         CpuPreviewCanvas(editor, modifier)
     } else {
-        val view = remember(context) { GpuPreviewSurfaceView(context) }
+        val view = remember(context) { GpuPreviewSurfaceView(context) { gpuFailed.value = true } }
         AndroidView(
             factory = { view },
             modifier = modifier,
@@ -151,8 +153,8 @@ fun PreviewCanvas(editor: EditorState, modifier: Modifier = Modifier) {
     }
 }
 
-private class GpuPreviewSurfaceView(context: Context) : GLSurfaceView(context) {
-    private val gpuRenderer = CompositionGlRenderer()
+private class GpuPreviewSurfaceView(context: Context, onGpuFailure: () -> Unit) : GLSurfaceView(context) {
+    private val gpuRenderer = CompositionGlRenderer(onGpuFailure)
     init {
         setEGLContextClientVersion(2)
         setPreserveEGLContextOnPause(true)
@@ -171,7 +173,7 @@ private class GpuPreviewSurfaceView(context: Context) : GLSurfaceView(context) {
     }
 }
 
-private class CompositionGlRenderer : GLSurfaceView.Renderer {
+private class CompositionGlRenderer(private val onGpuFailure: () -> Unit) : GLSurfaceView.Renderer {
     @Volatile private var scene = GpuScene(emptyList(), null)
     private var program = 0
     private var solidProgram = 0
@@ -195,15 +197,21 @@ private class CompositionGlRenderer : GLSurfaceView.Renderer {
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES20.glClearColor(0.02f, 0.02f, 0.04f, 1f)
         GLES20.glDisable(GLES20.GL_DEPTH_TEST)
-        program = linkProgram(VERTEX_SHADER, TEXTURE_SHADER)
-        solidProgram = linkProgram(VERTEX_SHADER, SOLID_SHADER)
-        positionHandle = GLES20.glGetAttribLocation(program, "aPosition")
-        uvHandle = GLES20.glGetAttribLocation(program, "aTexCoord")
-        samplerHandle = GLES20.glGetUniformLocation(program, "uTexture")
-        alphaHandle = GLES20.glGetUniformLocation(program, "uAlpha")
-        grayHandle = GLES20.glGetUniformLocation(program, "uGray")
-        solidPositionHandle = GLES20.glGetAttribLocation(solidProgram, "aPosition")
-        solidColorHandle = GLES20.glGetUniformLocation(solidProgram, "uColor")
+        try {
+            program = linkProgram(VERTEX_SHADER, TEXTURE_SHADER)
+            solidProgram = linkProgram(VERTEX_SHADER, SOLID_SHADER)
+            positionHandle = GLES20.glGetAttribLocation(program, "aPosition")
+            uvHandle = GLES20.glGetAttribLocation(program, "aTexCoord")
+            samplerHandle = GLES20.glGetUniformLocation(program, "uTexture")
+            alphaHandle = GLES20.glGetUniformLocation(program, "uAlpha")
+            grayHandle = GLES20.glGetUniformLocation(program, "uGray")
+            solidPositionHandle = GLES20.glGetAttribLocation(solidProgram, "aPosition")
+            solidColorHandle = GLES20.glGetUniformLocation(solidProgram, "uColor")
+        } catch (_: Throwable) {
+            program = 0
+            solidProgram = 0
+            Handler(Looper.getMainLooper()).post { onGpuFailure() }
+        }
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
@@ -214,6 +222,7 @@ private class CompositionGlRenderer : GLSurfaceView.Renderer {
 
     override fun onDrawFrame(gl: GL10?) {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+        if (program == 0) return
         val current = scene
         val activeTextureIds = current.layers.mapTo(HashSet()) { it.id }
         val staleIds = textures.keys.filter { it !in activeTextureIds }
