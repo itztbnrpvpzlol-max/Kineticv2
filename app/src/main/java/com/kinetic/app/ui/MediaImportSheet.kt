@@ -67,6 +67,7 @@ fun MediaImportSheet(
     var entries by remember { mutableStateOf<List<ImportMediaEntry>>(emptyList()) }
     var selected by remember { mutableStateOf<ImportMediaEntry?>(null) }
     var trimStart by remember { mutableFloatStateOf(0f) }
+    var previewAt by remember { mutableFloatStateOf(0f) }
     var trimEnd by remember { mutableFloatStateOf(5f) }
     var hasPermission by remember { mutableStateOf(false) }
 
@@ -128,7 +129,7 @@ fun MediaImportSheet(
         selected = null
     }
 
-    val previewTime = if (selected?.type == LayerType.VIDEO) trimStart else 0f
+    val previewTime = if (selected?.type == LayerType.VIDEO) previewAt else 0f
     val preview by produceState<android.graphics.Bitmap?>(null, selected?.uri, previewTime) {
         val item = selected
         value = if (item != null && item.type != LayerType.AUDIO) {
@@ -171,6 +172,7 @@ fun MediaImportSheet(
                     Row(Modifier.fillMaxWidth().clickable {
                         selected = item
                         trimStart = 0f
+                        previewAt = 0f
                         trimEnd = item.duration.coerceAtLeast(0.1f)
                     }.padding(vertical = 9.dp, horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.size(34.dp).clip(RoundedCornerShape(7.dp)).background(KColors.Surface2), contentAlignment = Alignment.Center) {
