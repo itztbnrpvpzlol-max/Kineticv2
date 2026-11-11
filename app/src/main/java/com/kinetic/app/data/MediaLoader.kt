@@ -14,10 +14,12 @@ import kotlinx.coroutines.withContext
 object MediaLoader {
     class Info(val length: Float?, val width: Int, val height: Int)
 
-    private val cache = object : LruCache<String, Bitmap>(48 * 1024 * 1024) {
+    private val cache = object : LruCache<String, Bitmap>(128 * 1024 * 1024) {
         override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount
     }
     private val retrievers = HashMap<String, MediaMetadataRetriever>()
+
+    fun configureCache(memoryMb: Int) { cache.resize(memoryMb.coerceIn(32, 512) * 1024 * 1024) }
 
     @Synchronized
     fun releaseAll() {
