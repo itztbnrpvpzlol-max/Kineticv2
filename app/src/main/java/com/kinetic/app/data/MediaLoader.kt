@@ -1,6 +1,7 @@
 package com.kinetic.app.data
 
 import android.content.Context
+import android.os.Build
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
@@ -99,12 +100,23 @@ object MediaLoader {
             val r = retrievers.computeIfAbsent(key) {
                 MediaMetadataRetriever().apply { setDataSource(ctx, uri) }
             }
-            val f = r.getFrameAtTime((sec * 1_000_000f).toLong(), MediaMetadataRetriever.OPTION_CLOSEST)
-                ?: return@synchronized null
-            val m = maxOf(f.width, f.height)
-            if (m <= maxEdge) f else {
-                val scale = maxEdge.toFloat() / m
-                Bitmap.createScaledBitmap(f, (f.width * scale).toInt(), (f.height * scale).toInt(), true)
+            val timeUs = (sec * 1_000_000f).toLong()
+            if (Build.VERSION.SDK_INT >= 27) {
+                var sourceW = r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: maxEdge
+                var sourceH = r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: maxEdge
+                val rotation = r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull() ?: 0
+                if (rotation == 90 || rotation == 270) { val swap = sourceW; sourceW = sourceH; sourceH = swap }
+                val scale = minOf(1f, maxEdge.toFloat() / maxOf(sourceW, sourceH, 1))
+                val targetW = (sourceW * scale).toInt().coerceAtLeast(1)
+                val targetH = (sourceH * scale).toInt().coerceAtLeast(1)
+                r.getScaledFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST, targetW, targetH)
+            } else {
+                val frame = r.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST) ?: return@synchronized null
+                val longest = maxOf(frame.width, frame.height)
+                if (longest <= maxEdge) frame else {
+                    val scale = maxEdge.toFloat() / longest
+                    Bitmap.createScaledBitmap(frame, (frame.width * scale).toInt(), (frame.height * scale).toInt(), true)
+                }
             }
         }
     }
