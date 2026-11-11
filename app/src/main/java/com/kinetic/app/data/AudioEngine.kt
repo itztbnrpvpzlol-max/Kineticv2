@@ -60,8 +60,8 @@ class AudioEngine(context: Context) {
             player.volume = layer.volume.coerceIn(0f, 2f)
             val targetMs = sourcePositionMs(layer, time)
             if (!player.playWhenReady) {
-                // Resume without an unconditional seek. ExoPlayer retains its decoder
-                // and buffered data while the clip is temporarily outside the playhead.
+                // Seek before resuming so clips entered mid-source never begin at zero.
+                player.seekTo(targetMs)
                 player.playWhenReady = true
             }
             val currentMs = player.currentPosition
