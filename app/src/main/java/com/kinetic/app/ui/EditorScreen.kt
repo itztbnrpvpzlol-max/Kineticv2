@@ -299,7 +299,7 @@ private fun TopBar(editor: EditorState, onMenuHome: () -> Unit, onOpenSettings: 
 
 @Composable
 private fun UnifiedEditingDock(active: String, onSelect: (String) -> Unit) {
-    val tools = listOf("Select" to IconKind.SELECT, "Properties" to IconKind.SLIDERS, "Speed" to IconKind.STOPWATCH, "Volume" to IconKind.VOLUME, "Extract audio" to IconKind.WAVEFORM, "Masking" to IconKind.MASK, "Effects" to IconKind.EFFECTS, "Blending" to IconKind.BLEND, "Blend modes" to IconKind.GRID, "Graph" to IconKind.GRAPH, "Text" to IconKind.TEXT, "Shapes" to IconKind.SHAPES, "Layers" to IconKind.LAYERS, "Adjust" to IconKind.ADJ)
+    val tools = listOf("Select" to IconKind.SELECT, "Properties" to IconKind.SLIDERS, "Speed" to IconKind.STOPWATCH, "Volume" to IconKind.VOLUME, "Extract audio" to IconKind.WAVEFORM, "Masking" to IconKind.MASK, "Effects" to IconKind.EFFECTS, "Blending" to IconKind.BLEND, "Blend modes" to IconKind.GRID, "Graph" to IconKind.GRID, "Text" to IconKind.TEXT, "Shapes" to IconKind.SHAPES, "Layers" to IconKind.LAYERS, "Adjust" to IconKind.ADJ)
     Row(Modifier.fillMaxWidth().height(66.dp).background(KColors.Surface).horizontalScroll(rememberScrollState()).padding(horizontal = 5.dp), verticalAlignment = Alignment.CenterVertically) {
         tools.forEach { (label, icon) ->
             Column(Modifier.width(66.dp).fillMaxHeight().clip(RoundedCornerShape(8.dp)).clickable { onSelect(label) }.padding(vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
