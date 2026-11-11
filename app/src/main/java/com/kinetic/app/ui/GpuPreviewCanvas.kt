@@ -67,7 +67,7 @@ fun PreviewCanvas(editor: EditorState, modifier: Modifier = Modifier) {
     LaunchedEffect(editor.layers.map { it.id }) {
         val currentIds = editor.layers.mapTo(HashSet<String>()) { it.id }
         val stale = textTextures.keys.filter { it !in currentIds }
-        stale.forEach { id -> textTextures.remove(id)?.second?.let { if (!it.isRecycled) it.recycle() } }
+        stale.forEach { id -> textTextures.remove(id) }
     }
 
     for (layer in editor.layers) {
