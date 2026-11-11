@@ -15,7 +15,8 @@ import kotlin.math.roundToInt
 /** One open composition. A new instance is always empty. */
 class EditorState(val settings: AppSettings, val projectId: String = UUID.randomUUID().toString(), var projectName: String = "Untitled") {
     var resolution by mutableIntStateOf(settings.resolution)
-    var duration by mutableFloatStateOf(settings.compSeconds.toFloat())
+    private var baseDuration by mutableFloatStateOf(settings.compSeconds.toFloat())
+    val duration: Float get() = maxOf(baseDuration, layers.maxOfOrNull { it.end } ?: 0f, 0.1f)
     var layers by mutableStateOf<List<Layer>>(emptyList())
         private set
     var time by mutableFloatStateOf(0f)
@@ -35,7 +36,7 @@ class EditorState(val settings: AppSettings, val projectId: String = UUID.random
     val frame: Float get() = 1f / settings.fps
     val selected: Layer? get() = layers.firstOrNull { it.id == selectedId }
     fun restoreProject(savedDuration: Float, savedResolution: Int, savedLayers: List<Layer>, savedTime: Float = 0f) {
-        duration = savedDuration.coerceAtLeast(0.1f)
+        baseDuration = maxOf(savedDuration, savedLayers.maxOfOrNull { it.end } ?: 0f, 0.1f)
         resolution = savedResolution.coerceIn(0, 3)
         time = savedTime.coerceIn(0f, duration)
         layers = savedLayers
@@ -100,10 +101,10 @@ class EditorState(val settings: AppSettings, val projectId: String = UUID.random
         if (seekTo != null) time = seekTo.coerceIn(0f, duration)
     }
 
-    fun seek(t: Float) { time = t.coerceIn(0f, duration) }
+    fun seek(t: Float) { time = t.coerceAtLeast(0f) }
 
     fun seekSnap(t: Float, windowSec: Float) {
-        val raw = t.coerceIn(0f, duration)
+        val raw = t.coerceAtLeast(0f)
         if (settings.snap) {
             val times = selected?.props?.values?.flatMap { p -> p.keys.map { it.t } } ?: emptyList()
             val near = times.minByOrNull { abs(it - raw) }
@@ -219,9 +220,9 @@ class EditorState(val settings: AppSettings, val projectId: String = UUID.random
 
     fun moveLayerEndToPlayhead(id: String) {
         val l = layers.firstOrNull { it.id == id } ?: return
-        val target = time.coerceAtLeast(l.start + frame).coerceAtMost(duration)
+        val target = time.coerceAtLeast(l.start + frame)
         val requested = target - l.start
-        val maxDuration = if (l.srcLength.isFinite()) (l.srcLength - l.srcOffset).coerceAtLeast(frame) else duration - l.start
+        val maxDuration = if (l.srcLength.isFinite()) (l.srcLength - l.srcOffset).coerceAtLeast(frame) else Float.POSITIVE_INFINITY
         updateLayer(id) { it.copy(duration = requested.coerceIn(frame, maxDuration)) }
     }
 

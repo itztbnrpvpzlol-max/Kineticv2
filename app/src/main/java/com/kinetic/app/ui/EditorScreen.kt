@@ -89,6 +89,8 @@ fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> 
     var renameTarget by remember { mutableStateOf<Layer?>(null) }
     var parentPicker by remember { mutableStateOf(false) }
     var previewExpanded by remember { mutableStateOf(false) }
+    var previewHeight by remember { mutableFloatStateOf(210f) }
+    var alightTool by remember { mutableStateOf("") }
 
     fun leave() { if (editor.layers.isEmpty()) onExit() else showLeave = true }
     BackHandler { leave() }
@@ -167,30 +169,36 @@ fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> 
         if (previewExpanded) {
             PreviewCanvas(editor, Modifier.weight(1f).fillMaxWidth())
         } else {
-            PreviewCanvas(editor, Modifier.fillMaxWidth().aspectRatio(16f / 9f))
+            PreviewCanvas(editor, Modifier.fillMaxWidth().height(previewHeight.dp))
+            Box(Modifier.fillMaxWidth().height(10.dp).background(KColors.Bg).pointerInput(Unit) {
+                detectVerticalDragGestures { change, drag -> change.consume(); previewHeight = (previewHeight + drag / density).coerceIn(120f, 420f) }
+            }, contentAlignment = Alignment.Center) {
+                Box(Modifier.width(44.dp).height(4.dp).clip(CircleShape).background(KColors.Muted))
+            }
         }
         PreviewToolsBar(editor, onAddLayer = { showLayers = true }, onTogglePreview = { previewExpanded = !previewExpanded })
         if (!previewExpanded) {
             TimelinePane(editor, Modifier.weight(1f))
-            editor.selected?.let { activeLayer ->
-                Box(Modifier.fillMaxWidth().height(9.dp).background(KColors.Bg).pointerInput(activeLayer.id) {
-                    detectVerticalDragGestures { change, drag -> change.consume(); panelHeight = (panelHeight - drag / density).coerceIn(130f, 360f) }
-                }, contentAlignment = Alignment.Center) {
-                    Box(Modifier.width(42.dp).height(4.dp).clip(CircleShape).background(KColors.Muted))
+            val activeLayer = editor.selected
+            if (activeLayer != null && !editor.settings.afterEffectsScrubbing) {
+                AlightCutBar(editor, activeLayer)
+                AlightDock(active = alightTool, onSelect = { alightTool = it })
+                if (alightTool == "Properties") {
+                    ResizeHandle(density) { panelHeight = it }
+                    EditPanel(editor, activeLayer, panelTab, { panelTab = it }, { alightTool = "" },
+                        onRename = { renameTarget = activeLayer }, onParent = { parentPicker = true },
+                        modifier = Modifier.fillMaxWidth().height(panelHeight.dp))
                 }
+            } else if (activeLayer != null && editor.settings.afterEffectsScrubbing) {
+                ResizeHandle(density) { panelHeight = it }
                 EditPanel(editor, activeLayer, panelTab, { panelTab = it }, { editor.select(null) },
-                    onRename = { renameTarget = activeLayer },
-                    onParent = { parentPicker = true },
+                    onRename = { renameTarget = activeLayer }, onParent = { parentPicker = true },
                     modifier = Modifier.fillMaxWidth().height(panelHeight.dp))
             }
-
             BottomToolbar(
-                onSelect = { editor.select(null) },
-                onText = { editor.addText() },
-                onShapes = { editor.addShape() },
-                onLayers = { showLayers = true },
-                onAdjust = { editor.addAdjustment() },
-                onAdd = { showImport = true }
+                onSelect = { editor.select(null) }, onText = { editor.addText() },
+                onShapes = { editor.addShape() }, onLayers = { showLayers = true },
+                onAdjust = { editor.addAdjustment() }, onAdd = { showImport = true }
             )
         }
     }
@@ -282,6 +290,62 @@ private fun TopBar(editor: EditorState, onMenuHome: () -> Unit, onOpenSettings: 
         }
         IconButton(onClick = onExport) { KIcon(IconKind.PLAY, KColors.Text, Modifier.size(24.dp)) }
         IconButton(onClick = onOpenSettings) { Icon(Icons.Default.Settings, "Preferences", tint = KColors.Text) }
+    }
+}
+
+
+@Composable
+private fun ResizeHandle(density: Float, onHeight: (Float) -> Unit) {
+    var current by remember { mutableFloatStateOf(210f) }
+    Box(Modifier.fillMaxWidth().height(9.dp).background(KColors.Bg).pointerInput(Unit) {
+        detectVerticalDragGestures { change, drag -> change.consume(); current = (current - drag / density).coerceIn(130f, 360f); onHeight(current) }
+    }, contentAlignment = Alignment.Center) {
+        Box(Modifier.width(42.dp).height(4.dp).clip(CircleShape).background(KColors.Muted))
+    }
+}
+
+@Composable
+private fun AlightCutBar(editor: EditorState, layer: Layer) {
+    val inside = editor.time > layer.start + editor.frame && editor.time < layer.end - editor.frame
+    Row(Modifier.fillMaxWidth().height(42.dp).padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (inside) {
+            CutAction("Split", IconKind.SPLIT) { editor.splitSelected() }
+            CutAction("Trim start", IconKind.CUT) { editor.trimLeft(layer.id, editor.time - layer.start) }
+            CutAction("Trim end", IconKind.CUT) { editor.moveLayerEndToPlayhead(layer.id) }
+        } else if (editor.time < layer.start) {
+            CutAction("Move to playhead", IconKind.PREV) { editor.moveLayerStartToPlayhead(layer.id) }
+        } else {
+            CutAction("Extend to playhead", IconKind.NEXT) { editor.extendLayerToPlayhead(layer.id) }
+        }
+        CutAction("Duplicate", IconKind.COPY) { editor.duplicate(layer.id) }
+        CutAction("Delete", IconKind.DELETE) { editor.deleteLayer(layer.id) }
+    }
+}
+
+@Composable
+private fun CutAction(label: String, icon: IconKind, onClick: () -> Unit) {
+    Row(Modifier.weight(1f).height(34.dp).clip(RoundedCornerShape(8.dp)).background(KColors.Surface2).clickable(onClick = onClick).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+        KIcon(icon, KColors.Text, Modifier.size(15.dp))
+        Spacer(Modifier.width(3.dp))
+        Text(label, color = KColors.Text, fontSize = 9.sp, maxLines = 1)
+    }
+}
+
+@Composable
+private fun AlightDock(active: String, onSelect: (String) -> Unit) {
+    val tools = listOf(
+        "Properties" to IconKind.SLIDERS, "Speed" to IconKind.STOPWATCH,
+        "Volume" to IconKind.VOLUME, "Extract audio" to IconKind.WAVEFORM,
+        "Masking" to IconKind.MASK, "Effects" to IconKind.EFFECTS,
+        "Blending & opacity" to IconKind.BLEND, "Blend modes" to IconKind.GRID
+    )
+    Row(Modifier.fillMaxWidth().height(64.dp).background(KColors.Surface).padding(horizontal = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+        tools.forEach { (label, icon) ->
+            Column(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(7.dp)).clickable { onSelect(label) }.padding(vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                KIcon(icon, if (active == label) KColors.Accent else KColors.Muted, Modifier.size(19.dp))
+                Text(label, color = if (active == label) KColors.Accent else KColors.Muted, fontSize = 7.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
     }
 }
 

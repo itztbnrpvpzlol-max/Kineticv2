@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -89,7 +90,7 @@ private fun PropRow(editor: EditorState, layer: Layer, id: PropId) {
             contentAlignment = Alignment.Center
         ) { KIcon(IconKind.STOPWATCH, if (p.animated) KColors.Accent else KColors.Dim) }
         Text(id.label, color = KColors.Text, fontSize = 14.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, modifier = Modifier.weight(1f), maxLines = 1)
-        ScrubValue(editor, layer, id, value)
+        if (editor.settings.afterEffectsScrubbing) ScrubValue(editor, layer, id, value) else PropertySlider(editor, layer, id, value)
         Box(
             Modifier.size(30.dp).clickable(enabled = p.animated) { editor.jumpKey(layer.id, id, -1) },
             contentAlignment = Alignment.Center
@@ -107,6 +108,21 @@ private fun PropRow(editor: EditorState, layer: Layer, id: PropId) {
             Modifier.size(30.dp).clickable(enabled = p.animated) { editor.jumpKey(layer.id, id, 1) },
             contentAlignment = Alignment.Center
         ) { KIcon(IconKind.NEXT, if (p.animated) KColors.Muted else KColors.Dim, Modifier.size(16.dp)) }
+    }
+}
+
+
+@Composable
+private fun PropertySlider(editor: EditorState, layer: Layer, id: PropId, value: Float) {
+    val range = when (id) {
+        PropId.OPACITY -> 0f..100f
+        PropId.ROTATION -> -360f..360f
+        PropId.SCALE_X, PropId.SCALE_Y -> 0f..300f
+        else -> -1000f..1000f
+    }
+    Column(Modifier.width(116.dp).padding(horizontal = 3.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(id.format(value), color = KColors.Accent, fontSize = 10.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, maxLines = 1)
+        Slider(value = value.coerceIn(range), onValueChange = { editor.setPropValue(layer.id, id, it) }, valueRange = range)
     }
 }
 

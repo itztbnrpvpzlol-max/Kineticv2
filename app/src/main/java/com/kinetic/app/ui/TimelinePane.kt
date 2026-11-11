@@ -136,6 +136,14 @@ fun TimelinePane(editor: EditorState, modifier: Modifier = Modifier) {
             .fillMaxWidth()
             .onSizeChanged { paneW = it.width }
             .pointerInput(Unit) { detectPinch { z -> pps = (pps * z).coerceIn(18f, 400f) } }
+            .pointerInput(pps) {
+                detectDragGestures { change, drag ->
+                    if (change.position.x > leftPx) {
+                        change.consume()
+                        editor.seek((editor.time - drag.x / dens / pps).coerceAtLeast(0f))
+                    }
+                }
+            }
     ) {
         Column(Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxWidth().height(30.dp)) {
