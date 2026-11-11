@@ -113,12 +113,21 @@ fun PreviewCanvas(editor: EditorState, modifier: Modifier = Modifier) {
                     }
                     LayerType.TEXT -> {
                         textPaint.color = l.color; textPaint.alpha = alpha
+                        textPaint.xfermode = when (l.blendMode) {
+                            "Multiply" -> PorterDuffXfermode(PorterDuff.Mode.MULTIPLY)
+                            "Screen" -> PorterDuffXfermode(PorterDuff.Mode.SCREEN)
+                            "Add" -> PorterDuffXfermode(PorterDuff.Mode.ADD)
+                            else -> null
+                        }
+                        textPaint.colorFilter = if ("Grayscale" in l.effects) ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(0f) }) else null
                         nc.drawText(l.text, l.width / 2f, l.height / 2f + 40f, textPaint)
                     }
                     else -> Unit
                 }
                 paint.xfermode = null
                 paint.colorFilter = null
+                textPaint.xfermode = null
+                textPaint.colorFilter = null
                 nc.restore()
             }
             nc.restore()
