@@ -83,6 +83,8 @@ fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> 
     var showLeave by remember { mutableStateOf(false) }
     var panelHeight by remember { mutableFloatStateOf(210f) }
     var panelTab by remember { mutableIntStateOf(0) }
+    var renameTarget by remember { mutableStateOf<Layer?>(null) }
+    var parentPicker by remember { mutableStateOf(false) }
 
     fun leave() { if (editor.layers.isEmpty()) onExit() else showLeave = true }
     BackHandler { leave() }
@@ -167,8 +169,8 @@ fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> 
                 Box(Modifier.width(42.dp).height(4.dp).clip(CircleShape).background(KColors.Muted))
             }
             EditPanel(editor, activeLayer, panelTab, { panelTab = it }, { editor.select(null) },
-                onRename = { Toast.makeText(ctx, "Rename from layer actions", Toast.LENGTH_SHORT).show() },
-                onParent = { Toast.makeText(ctx, "Parent picker", Toast.LENGTH_SHORT).show() },
+                onRename = { renameTarget = activeLayer },
+                onParent = { parentPicker = true },
                 modifier = Modifier.fillMaxWidth().height(panelHeight.dp))
         }
 
@@ -201,6 +203,25 @@ fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> 
                 DialogItem("Adjustment layer") { showLayers = false; editor.addAdjustment() }
                 DialogItem("Text") { showLayers = false; editor.addText() }
                 DialogItem("Shape") { showLayers = false; editor.addShape() }
+            }
+        }
+    }
+    if (renameTarget != null) {
+        val target = renameTarget!!
+        TextInputDialog(
+            title = "Rename layer", initial = target.name,
+            onDone = { editor.renameLayer(target.id, it.trim().ifBlank { target.name }); renameTarget = null },
+            onDismiss = { renameTarget = null }
+        )
+    }
+    if (parentPicker) {
+        val target = editor.selected
+        ActionDialog("Set parent", { parentPicker = false }) {
+            DialogItem("No parent") { target?.let { editor.setParent(it.id, null) }; parentPicker = false }
+            editor.layers.filter { candidate ->
+                candidate.id != target?.id && target != null && !isDescendantOf(candidate, target.id, editor.layers.associateBy { it.id })
+            }.forEach { candidate ->
+                DialogItem(candidate.name) { target?.let { editor.setParent(it.id, candidate.id) }; parentPicker = false }
             }
         }
     }
@@ -293,7 +314,16 @@ private fun EditPanel(
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, containerColor = KColors.Surface2) {
                     DropdownMenuItem(text = { Text(if (layer.type == LayerType.TEXT) "Edit text" else "Rename", color = KColors.Text) }, onClick = { menu = false; onRename() })
                     DropdownMenuItem(text = { Text("Duplicate", color = KColors.Text) }, onClick = { menu = false; editor.duplicate(layer.id) })
-                    DropdownMenuItem(text = { Text("Split at playhead", color = KColors.Text) }, onClick = { menu = false; editor.splitSelected() })
+                    if (editor.time > layer.start + editor.frame && editor.time < layer.end - editor.frame) {
+                        DropdownMenuItem(text = { Text("Split at playhead", color = KColors.Text) }, onClick = { menu = false; editor.splitSelected() })
+                        DropdownMenuItem(text = { Text("Trim end to playhead", color = KColors.Text) }, onClick = { menu = false; editor.moveLayerEndToPlayhead(layer.id) })
+                    }
+                    if (editor.time < layer.start) {
+                        DropdownMenuItem(text = { Text("Move layer to playhead", color = KColors.Text) }, onClick = { menu = false; editor.moveLayerStartToPlayhead(layer.id) })
+                    }
+                    if (editor.time > layer.end) {
+                        DropdownMenuItem(text = { Text("Extend to playhead", color = KColors.Text) }, onClick = { menu = false; editor.extendLayerToPlayhead(layer.id) })
+                    }
                     DropdownMenuItem(text = { Text("Parent", color = KColors.Text) }, onClick = { menu = false; onParent() })
                     DropdownMenuItem(text = { Text("Delete", color = KColors.Danger) }, onClick = { menu = false; editor.deleteLayer(layer.id) })
                 }
