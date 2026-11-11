@@ -157,10 +157,10 @@ fun MediaImportSheet(
         selected = null
     }
 
-    val previewTime = if (selected?.type == LayerType.VIDEO) previewAt else 0f
+    val previewTime = 0f
     val preview by produceState<android.graphics.Bitmap?>(null, selected?.uri, previewTime) {
         val item = selected
-        value = if (item != null && item.type != LayerType.AUDIO) {
+        value = if (item?.type == LayerType.IMAGE) {
             MediaLoader.bitmapFor(context, item.uri, item.type, previewTime, 8, 720)
         } else null
     }
