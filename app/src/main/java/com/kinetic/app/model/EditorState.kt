@@ -156,6 +156,25 @@ class EditorState(val settings: AppSettings, val projectId: String = UUID.random
         addLayer(audio)
     }
 
+    fun addMediaTrimmed(type: LayerType, name: String, uri: String, w: Int, h: Int, sourceLength: Float?, trimStart: Float, trimEnd: Float) {
+        val startOffset = trimStart.coerceAtLeast(0f)
+        val endOffset = trimEnd.coerceAtLeast(startOffset + 0.1f)
+        val duration = (endOffset - startOffset).coerceAtLeast(0.1f)
+        val layerWidth: Float
+        val layerHeight: Float
+        if (type == LayerType.AUDIO) {
+            layerWidth = 0f; layerHeight = 0f
+        } else if (w <= 0 || h <= 0) {
+            layerWidth = COMP_W; layerHeight = COMP_H
+        } else {
+            val scale = minOf(COMP_W / w, COMP_H / h)
+            layerWidth = w * scale; layerHeight = h * scale
+        }
+        val layer = newLayer(type, name, time, duration, layerWidth, layerHeight, uri,
+            sourceLength ?: Float.POSITIVE_INFINITY).copy(srcOffset = if (type == LayerType.IMAGE) 0f else startOffset)
+        addLayer(layer)
+    }
+
     fun deleteLayer(id: String) {
         commit { ls -> ls.filter { it.id != id }.map { if (it.parentId == id) it.copy(parentId = null) else it } }
         fixSelection()

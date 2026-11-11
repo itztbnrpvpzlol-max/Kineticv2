@@ -230,10 +230,24 @@ fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> 
         }
     }
     if (showImport) {
-        ActionDialog("Import media", { showImport = false }) {
-            DialogItem("Video") { showImport = false; pickVideo.launch(arrayOf("video/*")) }
-            DialogItem("Image") { showImport = false; pickImage.launch(arrayOf("image/*")) }
-            DialogItem("Audio") { showImport = false; pickAudio.launch(arrayOf("audio/*")) }
+        ModalBottomSheet(
+            onDismissRequest = { showImport = false },
+            containerColor = KColors.Surface,
+            dragHandle = { Box(Modifier.padding(vertical = 8.dp).size(width = 42.dp, height = 4.dp).clip(CircleShape).background(KColors.Muted)) }
+        ) {
+            MediaImportSheet(
+                onDismiss = { showImport = false },
+                onImport = { item, trimIn, trimOut ->
+                    scope.launch {
+                        val info = withContext(Dispatchers.IO) { MediaLoader.probe(ctx, item.uri, item.type) }
+                        editor.addMediaTrimmed(item.type, item.name, item.uri.toString(),
+                            if (info.width > 0) info.width else item.width,
+                            if (info.height > 0) info.height else item.height,
+                            if (item.type == LayerType.IMAGE) null else item.duration,
+                            trimIn, trimOut)
+                    }
+                }
+            )
         }
     }
     if (showLayers) {
