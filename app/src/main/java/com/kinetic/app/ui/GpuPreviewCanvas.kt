@@ -197,6 +197,10 @@ private class CompositionGlRenderer(private val onGpuFailure: () -> Unit) : GLSu
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES20.glClearColor(0.02f, 0.02f, 0.04f, 1f)
         GLES20.glDisable(GLES20.GL_DEPTH_TEST)
+        // A recreated EGL context invalidates every texture/program from the old context.
+        textures.clear()
+        program = 0
+        solidProgram = 0
         try {
             program = linkProgram(VERTEX_SHADER, TEXTURE_SHADER)
             solidProgram = linkProgram(VERTEX_SHADER, SOLID_SHADER)
