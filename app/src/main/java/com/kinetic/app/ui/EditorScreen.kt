@@ -73,6 +73,7 @@ import com.kinetic.app.data.ProjectStore
 import com.kinetic.app.model.EditorState
 import com.kinetic.app.model.Layer
 import com.kinetic.app.model.LayerType
+import com.kinetic.app.model.PropId
 import com.kinetic.app.model.isDescendantOf
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -384,6 +385,11 @@ private fun DockToolControls(
                 }
             }
             "Blending", "Blend modes" -> {
+                if (tool == "Blending") {
+                    val opacity = layer.p(PropId.OPACITY).valueAt(editor.time).coerceIn(0f, 100f)
+                    Text("Opacity  ·  ${opacity.toInt()}%", color = KColors.Text, fontSize = 14.sp)
+                    Slider(value = opacity, onValueChange = { editor.setPropValue(layer.id, PropId.OPACITY, it) }, valueRange = 0f..100f)
+                }
                 Text("Layer blend mode", color = KColors.Text, fontSize = 14.sp)
                 listOf("Normal", "Multiply", "Screen", "Add").forEach { mode ->
                     DialogItem((if (layer.blendMode == mode) "✓  " else "") + mode) {
