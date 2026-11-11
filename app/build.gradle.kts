@@ -13,9 +13,26 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "0.1"
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
+        }
+        externalNativeBuild {
+            cmake {
+                cppFlags += listOf("-std=c++17", "-O3", "-ffast-math")
+            }
+        }
     }
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        prefab = true
+    }
     composeOptions { kotlinCompilerExtensionVersion = "1.5.14" }
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -32,4 +49,8 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.activity:activity-compose:1.9.2")
     implementation("androidx.core:core-ktx:1.13.1")
+
+    // Media3 replaces synchronous MediaPlayer preparation/seeking in the timeline audio path.
+    implementation("androidx.media3:media3-exoplayer:1.5.1")
+    implementation("androidx.media3:media3-common:1.5.1")
 }
