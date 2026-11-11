@@ -45,11 +45,11 @@ fun PreviewCanvas(editor: EditorState, modifier: Modifier = Modifier) {
             val src = ((t - l.start).coerceAtLeast(0f) * l.speed + l.srcOffset).coerceAtLeast(0f)
             // Decode video preview frames at a bounded rate. Scrubbing and playback
             // share the same bucket size so toggling transport doesn't invalidate cache.
-            val bucket = if (!active) -1 else if (l.type == LayerType.VIDEO) (src * 6f).toInt() else 0
+            val bucket = if (!active) -1 else if (l.type == LayerType.VIDEO) (src * 12f).toInt() else 0
             key(l.id) {
                 LaunchedEffect(uri, bucket) {
                     if (bucket >= 0) {
-                        MediaLoader.bitmapFor(ctx, Uri.parse(uri), l.type, src, 6, 640)?.let { bitmaps[l.id] = it }
+                        MediaLoader.bitmapFor(ctx, Uri.parse(uri), l.type, src, 12, 640)?.let { bitmaps[l.id] = it }
                     }
                 }
             }
