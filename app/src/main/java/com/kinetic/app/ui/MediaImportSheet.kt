@@ -150,6 +150,7 @@ fun MediaImportSheet(
         Spacer(Modifier.height(10.dp))
         if (!hasPermission) {
             Text("Allow media access to browse files on this device.", color = KColors.Muted, fontSize = 13.sp)
+            Text("Grant access", color = KColors.Accent, modifier = Modifier.clickable { permissionLauncher.launch(permissions) }.padding(top = 10.dp))
         } else {
             Row(Modifier.fillMaxWidth().height(180.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Box(Modifier.weight(1f).fillMaxSize().clip(RoundedCornerShape(10.dp)).background(KColors.Bg), contentAlignment = Alignment.Center) {
@@ -159,6 +160,10 @@ fun MediaImportSheet(
                 Column(Modifier.weight(1f).fillMaxSize()) {
                     Text(selected?.name ?: "No selection", color = KColors.Text, fontSize = 12.sp, maxLines = 2)
                     if (selected != null) {
+                        if (selected!!.type == LayerType.VIDEO) {
+                            Text("Preview  ${String.format("%.2f", previewAt)}s", color = KColors.Muted, fontSize = 11.sp)
+                            Slider(value = previewAt, onValueChange = { previewAt = it }, valueRange = 0f..selected!!.duration.coerceAtLeast(0.1f))
+                        }
                         Text("In  ${String.format("%.2f", trimStart)}s", color = KColors.Muted, fontSize = 11.sp)
                         Slider(value = trimStart, onValueChange = { trimStart = it.coerceAtMost(trimEnd - 0.1f) }, valueRange = 0f..selected!!.duration.coerceAtLeast(0.1f))
                         Text("Out  ${String.format("%.2f", trimEnd)}s", color = KColors.Muted, fontSize = 11.sp)
