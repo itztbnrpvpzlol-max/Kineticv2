@@ -93,7 +93,7 @@ fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> 
     var parentPicker by remember { mutableStateOf(false) }
     var previewExpanded by remember { mutableStateOf(false) }
     var previewHeight by remember { mutableFloatStateOf(210f) }
-    var alightTool by remember { mutableStateOf("") }
+    var dockTool by remember { mutableStateOf("Select") }
 
     fun leave() { if (editor.layers.isEmpty()) onExit() else showLeave = true }
     BackHandler { leave() }
@@ -183,26 +183,26 @@ fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> 
         if (!previewExpanded) {
             TimelinePane(editor, Modifier.weight(1f))
             val activeLayer = editor.selected
-            if (activeLayer != null && !editor.settings.afterEffectsScrubbing) {
+            if (activeLayer != null) {
                 AlightCutBar(editor, activeLayer)
-                AlightDock(active = alightTool, onSelect = { alightTool = it })
-                if (alightTool == "Properties") {
-                    ResizeHandle(density) { panelHeight = it }
-                    EditPanel(editor, activeLayer, panelTab, { panelTab = it }, { alightTool = "" },
-                        onRename = { renameTarget = activeLayer }, onParent = { parentPicker = true },
-                        modifier = Modifier.fillMaxWidth().height(panelHeight.dp))
-                }
-            } else if (activeLayer != null && editor.settings.afterEffectsScrubbing) {
                 ResizeHandle(density) { panelHeight = it }
                 EditPanel(editor, activeLayer, panelTab, { panelTab = it }, { editor.select(null) },
                     onRename = { renameTarget = activeLayer }, onParent = { parentPicker = true },
                     modifier = Modifier.fillMaxWidth().height(panelHeight.dp))
             }
-            BottomToolbar(
-                onSelect = { editor.select(null) }, onText = { editor.addText() },
-                onShapes = { editor.addShape() }, onLayers = { showLayers = true },
-                onAdjust = { editor.addAdjustment() }, onAdd = { showImport = true }
-            )
+            UnifiedEditingDock(dockTool) { tool ->
+                dockTool = tool
+                when (tool) {
+                    "Select" -> editor.select(null)
+                    "Properties" -> if (activeLayer != null) panelTab = 0
+                    "Graph" -> if (activeLayer != null) panelTab = 1
+                    "Text" -> editor.addText()
+                    "Shapes" -> editor.addShape()
+                    "Layers" -> showLayers = true
+                    "Adjust" -> editor.addAdjustment()
+                    "Import" -> showImport = true
+                }
+            }
         }
     }
 
@@ -297,6 +297,22 @@ private fun TopBar(editor: EditorState, onMenuHome: () -> Unit, onOpenSettings: 
 }
 
 
+@Composable
+private fun UnifiedEditingDock(active: String, onSelect: (String) -> Unit) {
+    val tools = listOf("Select" to IconKind.SELECT, "Properties" to IconKind.SLIDERS, "Speed" to IconKind.STOPWATCH, "Volume" to IconKind.VOLUME, "Extract audio" to IconKind.WAVEFORM, "Masking" to IconKind.MASK, "Effects" to IconKind.EFFECTS, "Blending" to IconKind.BLEND, "Blend modes" to IconKind.GRID, "Graph" to IconKind.GRAPH, "Text" to IconKind.TEXT, "Shapes" to IconKind.SHAPES, "Layers" to IconKind.LAYERS, "Adjust" to IconKind.ADJ)
+    Row(Modifier.fillMaxWidth().height(66.dp).background(KColors.Surface).horizontalScroll(rememberScrollState()).padding(horizontal = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+        tools.forEach { (label, icon) ->
+            Column(Modifier.width(66.dp).fillMaxHeight().clip(RoundedCornerShape(8.dp)).clickable { onSelect(label) }.padding(vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                KIcon(icon, if (active == label) KColors.Accent else KColors.Muted, Modifier.size(20.dp))
+                Text(label, color = if (active == label) KColors.Accent else KColors.Muted, fontSize = 8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        Column(Modifier.width(58.dp).fillMaxHeight().clickable { onSelect("Import") }, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            Box(Modifier.size(36.dp).clip(CircleShape).background(KColors.Fab), contentAlignment = Alignment.Center) { KIcon(IconKind.PLUS, KColors.Text, Modifier.size(24.dp)) }
+            Text("Import", color = KColors.Muted, fontSize = 8.sp)
+        }
+    }
+}
 @Composable
 private fun ResizeHandle(density: Float, onHeight: (Float) -> Unit) {
     var current by remember { mutableFloatStateOf(210f) }
