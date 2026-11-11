@@ -83,7 +83,7 @@ fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> 
     fun leave() { if (editor.layers.isEmpty()) onExit() else showLeave = true }
     BackHandler { leave() }
 
-    val audio = remember { AudioEngine(ctx, scope) }
+    val audio = remember { AudioEngine(ctx) }
     DisposableEffect(Unit) { onDispose { audio.release(); MediaLoader.releaseAll() } }
     val projectStore = remember { ProjectStore(ctx) }
     LaunchedEffect(editor.layers, editor.duration, editor.resolution, editor.projectName) {
