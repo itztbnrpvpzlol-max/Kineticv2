@@ -361,12 +361,12 @@ private fun DockToolControls(
             }
             "Masking" -> {
                 Text("Rectangular layer mask", color = KColors.Text, fontSize = 14.sp)
-                SwitchRow("Enable mask (80% frame)", layer.maskEnabled) { v -> editor.updateLayer(layer.id) { it.copy(maskEnabled = v) } }
+                DialogItem((if (layer.maskEnabled) "✓  " else "") + "Enable mask (80% frame)") { editor.updateLayer(layer.id) { it.copy(maskEnabled = !it.maskEnabled) } }
             }
             "Effects" -> {
                 Text("Basic preview effect", color = KColors.Text, fontSize = 14.sp)
-                SwitchRow("Grayscale", "Grayscale" in layer.effects) { enabled ->
-                    editor.updateLayer(layer.id) { it.copy(effects = if (enabled) it.effects + "Grayscale" else it.effects - "Grayscale") }
+                DialogItem((if ("Grayscale" in layer.effects) "✓  " else "") + "Toggle grayscale") {
+                    editor.updateLayer(layer.id) { it.copy(effects = if ("Grayscale" in it.effects) it.effects - "Grayscale" else it.effects + "Grayscale") }
                 }
             }
             "Blending", "Blend modes" -> {
