@@ -122,13 +122,17 @@ private fun PropertySlider(editor: EditorState, layer: Layer, id: PropId, value:
         PropId.SCALE_X, PropId.SCALE_Y -> 0f..300f
         else -> -1000f..1000f
     }
+    var editing by remember(layer.id, id) { mutableStateOf(false) }
     Column(Modifier.width(116.dp).padding(horizontal = 3.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Text(id.format(value), color = KColors.Accent, fontSize = 10.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, maxLines = 1)
         Canvas(Modifier.fillMaxWidth().height(7.dp)) {
             val gap = size.width / 24f
             for (i in 0..24) drawLine(KColors.Muted.copy(alpha = if (i % 4 == 0) 0.9f else 0.45f), Offset(i * gap, 1f), Offset(i * gap, if (i % 4 == 0) 7f else 5f), 1.dp.toPx())
         }
-        Slider(value = value.coerceIn(range), onValueChange = { editor.setPropValue(layer.id, id, it) }, valueRange = range)
+        Slider(value = value.coerceIn(range), onValueChange = {
+            if (!editing) { editor.beginEdit(); editing = true }
+            editor.setPropValue(layer.id, id, it)
+        }, onValueChangeFinished = { editing = false }, valueRange = range)
     }
 }
 

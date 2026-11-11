@@ -356,18 +356,19 @@ private fun DockToolControls(
     tool: String, editor: EditorState, layer: Layer,
     onClose: () -> Unit, onExtractAudio: () -> Unit
 ) {
+    var sliderEditing by remember(tool, layer.id) { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp)) {
         Text(tool, color = KColors.Text, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(12.dp))
         when (tool) {
             "Speed" -> {
                 Text("Playback speed  ·  ${String.format("%.2f×", layer.speed)}", color = KColors.Text, fontSize = 14.sp)
-                Slider(value = layer.speed, onValueChange = { v -> editor.updateLayer(layer.id, push = false) { it.copy(speed = v) } }, valueRange = 0.1f..4f)
+                Slider(value = layer.speed, onValueChange = { v -> if (!sliderEditing) { editor.beginEdit(); sliderEditing = true }; editor.updateLayer(layer.id, push = false) { it.copy(speed = v) } }, onValueChangeFinished = { sliderEditing = false }, valueRange = 0.1f..4f)
                 Text("Applies to video preview and linked audio playback.", color = KColors.Muted, fontSize = 12.sp)
             }
             "Volume" -> {
                 Text("Clip volume  ·  ${(layer.volume * 100).toInt()}%", color = KColors.Text, fontSize = 14.sp)
-                Slider(value = layer.volume, onValueChange = { v -> editor.updateLayer(layer.id, push = false) { it.copy(volume = v) } }, valueRange = 0f..2f)
+                Slider(value = layer.volume, onValueChange = { v -> if (!sliderEditing) { editor.beginEdit(); sliderEditing = true }; editor.updateLayer(layer.id, push = false) { it.copy(volume = v) } }, onValueChangeFinished = { sliderEditing = false }, valueRange = 0f..2f)
                 Text("Audio layers use this level during playback.", color = KColors.Muted, fontSize = 12.sp)
             }
             "Extract audio" -> {
@@ -388,7 +389,7 @@ private fun DockToolControls(
                 if (tool == "Blending") {
                     val opacity = layer.p(PropId.OPACITY).valueAt(editor.time).coerceIn(0f, 100f)
                     Text("Opacity  ·  ${opacity.toInt()}%", color = KColors.Text, fontSize = 14.sp)
-                    Slider(value = opacity, onValueChange = { editor.setPropValue(layer.id, PropId.OPACITY, it) }, valueRange = 0f..100f)
+                    Slider(value = opacity, onValueChange = { if (!sliderEditing) { editor.beginEdit(); sliderEditing = true }; editor.setPropValue(layer.id, PropId.OPACITY, it) }, onValueChangeFinished = { sliderEditing = false }, valueRange = 0f..100f)
                 }
                 Text("Layer blend mode", color = KColors.Text, fontSize = 14.sp)
                 listOf("Normal", "Multiply", "Screen", "Add").forEach { mode ->
