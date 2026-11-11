@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -44,6 +45,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -79,6 +81,8 @@ fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> 
     var showImport by remember { mutableStateOf(false) }
     var showLayers by remember { mutableStateOf(false) }
     var showLeave by remember { mutableStateOf(false) }
+    var panelHeight by remember { mutableFloatStateOf(210f) }
+    var panelTab by remember { mutableIntStateOf(0) }
 
     fun leave() { if (editor.layers.isEmpty()) onExit() else showLeave = true }
     BackHandler { leave() }
@@ -154,8 +158,19 @@ fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> 
         }, onExport = { Toast.makeText(ctx, "Export isn't built yet", Toast.LENGTH_SHORT).show() })
 
         PreviewCanvas(editor, Modifier.fillMaxWidth().aspectRatio(16f / 9f))
-        TransportBar(editor)
+        PreviewToolsBar(editor, onAddLayer = { showLayers = true })
         TimelinePane(editor, Modifier.weight(1f))
+        editor.selected?.let { activeLayer ->
+            Box(Modifier.fillMaxWidth().height(9.dp).background(KColors.Bg).pointerInput(activeLayer.id) {
+                detectVerticalDragGestures { change, drag -> change.consume(); panelHeight = (panelHeight - drag / density).coerceIn(130f, 360f) }
+            }, contentAlignment = Alignment.Center) {
+                Box(Modifier.width(42.dp).height(4.dp).clip(CircleShape).background(KColors.Muted))
+            }
+            EditPanel(editor, activeLayer, panelTab, { panelTab = it }, { editor.select(null) },
+                onRename = { Toast.makeText(ctx, "Rename from layer actions", Toast.LENGTH_SHORT).show() },
+                onParent = { Toast.makeText(ctx, "Parent picker", Toast.LENGTH_SHORT).show() },
+                modifier = Modifier.fillMaxWidth().height(panelHeight.dp))
+        }
 
         BottomToolbar(
             onSelect = { editor.select(null) },
@@ -239,26 +254,22 @@ private fun TopBar(editor: EditorState, onMenuHome: () -> Unit, onOpenSettings: 
 }
 
 @Composable
-private fun TransportBar(editor: EditorState) {
-    Row(Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-        Row(Modifier.weight(1f)) {
-            Text(editor.settings.formatTime(editor.time), color = KColors.Text, fontSize = 15.sp)
-            Text(" / ${editor.settings.formatTime(editor.duration)}", color = KColors.Muted, fontSize = 15.sp)
-        }
-        Box(
-            Modifier.size(44.dp).clip(CircleShape).clickable { editor.playing = !editor.playing },
-            contentAlignment = Alignment.Center
-        ) { KIcon(if (editor.playing) IconKind.PAUSE else IconKind.PLAY, KColors.Text, Modifier.size(26.dp)) }
-        Row(Modifier.weight(1f), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier.size(44.dp).alpha(if (editor.canUndo) 1f else 0.35f).clickable(enabled = editor.canUndo) { editor.undo() },
-                contentAlignment = Alignment.Center
-            ) { KIcon(IconKind.UNDO, KColors.Text, Modifier.size(24.dp)) }
-            Box(
-                Modifier.size(44.dp).alpha(if (editor.canRedo) 1f else 0.35f).clickable(enabled = editor.canRedo) { editor.redo() },
-                contentAlignment = Alignment.Center
-            ) { KIcon(IconKind.REDO, KColors.Text, Modifier.size(24.dp)) }
-        }
+private fun PreviewToolsBar(editor: EditorState, onAddLayer: () -> Unit) {
+    Row(Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceEvenly) {
+        PreviewTool(IconKind.UNDO, editor.canUndo) { editor.undo() }
+        PreviewTool(IconKind.REDO, editor.canRedo) { editor.redo() }
+        PreviewTool(IconKind.BACK) { editor.playing = false; editor.seek(0f) }
+        PreviewTool(if (editor.playing) IconKind.PAUSE else IconKind.PLAY) { editor.playing = !editor.playing }
+        PreviewTool(IconKind.NEXT) { editor.playing = false; editor.seek(editor.duration) }
+        PreviewTool(IconKind.PLUS, onClick = onAddLayer)
+        PreviewTool(IconKind.FIT) { }
+    }
+}
+
+@Composable
+private fun PreviewTool(icon: IconKind, enabled: Boolean = true, onClick: () -> Unit) {
+    Box(Modifier.size(42.dp).alpha(if (enabled) 1f else 0.35f).clip(RoundedCornerShape(10.dp)).clickable(enabled = enabled, onClick = onClick), contentAlignment = Alignment.Center) {
+        KIcon(icon, KColors.Text, Modifier.size(23.dp))
     }
 }
 
