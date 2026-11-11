@@ -252,7 +252,7 @@ fun GraphPanel(editor: EditorState, layer: Layer, modifier: Modifier = Modifier)
                 val isSelected = id == selected
                 Chip((if (visibleProps.contains(id)) "● " else "○ ") + id.label, isSelected) {
                     editor.selectProp(id)
-                    visibleProps = if (visibleProps.contains(id)) visibleProps else visibleProps + id
+                    visibleProps = if (visibleProps.contains(id)) visibleProps - id else visibleProps + id
                 }
             }
             Chip("All curves", visibleProps.containsAll(animated.toSet())) {
@@ -276,7 +276,7 @@ fun GraphPanel(editor: EditorState, layer: Layer, modifier: Modifier = Modifier)
             Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .pointerInput(selected, speedGraph, latestRange) {
+                .pointerInput(selected, speedGraph) {
                     detectTapGestures { point ->
                         val map = gmap(size.width.toFloat(), size.height.toFloat(), duration, latestRange, density)
                         val current = latestLayer.p(latestSelected)
@@ -285,7 +285,7 @@ fun GraphPanel(editor: EditorState, layer: Layer, modifier: Modifier = Modifier)
                         else editor.seek(map.t(point.x).coerceIn(0f, duration))
                     }
                 }
-                .pointerInput(selected, speedGraph, latestRange) {
+                .pointerInput(selected, speedGraph) {
                     var mode = 0 // 0 scrub, 1 value key, 2 value out, 3 value in, 4 speed out, 5 speed in
                     var segment = -1
                     val hitRadius = 25.dp.toPx()
