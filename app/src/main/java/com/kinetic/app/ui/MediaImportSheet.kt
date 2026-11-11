@@ -70,6 +70,14 @@ fun MediaImportSheet(
     val context = LocalContext.current
     val previewPlayer = remember { ExoPlayer.Builder(context).build() }
     DisposableEffect(previewPlayer) { onDispose { previewPlayer.release() } }
+    var tab by remember { mutableStateOf(0) }
+    var entries by remember { mutableStateOf<List<ImportMediaEntry>>(emptyList()) }
+    var selected by remember { mutableStateOf<ImportMediaEntry?>(null) }
+    var trimStart by remember { mutableFloatStateOf(0f) }
+    var previewAt by remember { mutableFloatStateOf(0f) }
+    var trimEnd by remember { mutableFloatStateOf(5f) }
+    var hasPermission by remember { mutableStateOf(false) }
+
     LaunchedEffect(selected?.uri) {
         previewPlayer.stop()
         val item = selected
@@ -81,14 +89,6 @@ fun MediaImportSheet(
     LaunchedEffect(selected?.uri, previewAt) {
         if (selected?.type == LayerType.VIDEO) previewPlayer.seekTo((previewAt * 1000f).toLong())
     }
-    var tab by remember { mutableStateOf(0) }
-    var entries by remember { mutableStateOf<List<ImportMediaEntry>>(emptyList()) }
-    var selected by remember { mutableStateOf<ImportMediaEntry?>(null) }
-    var trimStart by remember { mutableFloatStateOf(0f) }
-    var previewAt by remember { mutableFloatStateOf(0f) }
-    var trimEnd by remember { mutableFloatStateOf(5f) }
-    var hasPermission by remember { mutableStateOf(false) }
-
     val permissions = remember {
         if (Build.VERSION.SDK_INT >= 34) arrayOf(
             Manifest.permission.READ_MEDIA_IMAGES,
