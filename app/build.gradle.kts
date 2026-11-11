@@ -1,11 +1,11 @@
 plugins {
-    id("com.android.application") version "8.5.2"
+    id("com.android.application") version "8.6.1"
     id("org.jetbrains.kotlin.android") version "1.9.24"
 }
 
 android {
     namespace = "com.kinetic.app"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.kinetic.app"
@@ -50,7 +50,7 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.9.2")
     implementation("androidx.core:core-ktx:1.13.1")
 
-    // Media3 replaces synchronous MediaPlayer preparation/seeking in the timeline audio path.
+    // Media3 1.5.1 requires compileSdk 35.
     implementation("androidx.media3:media3-exoplayer:1.5.1")
     implementation("androidx.media3:media3-common:1.5.1")
 }
