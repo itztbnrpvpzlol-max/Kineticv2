@@ -240,13 +240,14 @@ private class CompositionGlRenderer(private val onGpuFailure: () -> Unit) : GLSu
         val texture = textureFor(layer.id, bitmap) ?: return
         val right = if (layer.mask) layer.width * 0.8f else layer.width
         val bottom = if (layer.mask) layer.height * 0.8f else layer.height
+        val uvMax = if (layer.mask) 0.8f else 1f
         val points = floatArrayOf(0f, 0f, 0f, bottom, right, 0f, right, bottom)
         layer.matrix.mapPoints(points)
         val data = floatArrayOf(
             ndcX(points[0], scale, ox), ndcY(points[1], scale, oy), 0f, 0f,
-            ndcX(points[2], scale, ox), ndcY(points[3], scale, oy), 0f, 0.8f,
-            ndcX(points[4], scale, ox), ndcY(points[5], scale, oy), 0.8f, 0f,
-            ndcX(points[6], scale, ox), ndcY(points[7], scale, oy), 0.8f, 0.8f
+            ndcX(points[2], scale, ox), ndcY(points[3], scale, oy), 0f, uvMax,
+            ndcX(points[4], scale, ox), ndcY(points[5], scale, oy), uvMax, 0f,
+            ndcX(points[6], scale, ox), ndcY(points[7], scale, oy), uvMax, uvMax
         )
         vertices.clear(); vertices.put(data); vertices.position(0)
         GLES20.glUseProgram(program)
