@@ -88,7 +88,7 @@ fun KIcon(kind: IconKind, tint: Color, modifier: Modifier = Modifier.size(22.dp)
             }
             IconKind.LAYERS -> { drawPath(poly(true,pt(.1f,.38f),pt(.5f,.18f),pt(.9f,.38f),pt(.5f,.58f)),tint,style=st); drawPath(poly(false,pt(.1f,.54f),pt(.5f,.74f),pt(.9f,.54f)),tint,style=st); drawPath(poly(false,pt(.1f,.7f),pt(.5f,.9f),pt(.9f,.7f)),tint,style=st) }
             IconKind.SLIDERS -> { line(pt(.12f,.25f),pt(.88f,.25f)); line(pt(.12f,.5f),pt(.88f,.5f)); line(pt(.12f,.75f),pt(.88f,.75f)); filledCircle(.35f,.25f,.09f); filledCircle(.65f,.5f,.09f); filledCircle(.45f,.75f,.09f) }
-            IconKind.PREV, IconKind.BACK -> { drawPath(poly(false,pt(.68f,.2f),pt(.32f,.5f),pt(.68f,.8f)),tint,style=st); if(kind==IconKind.BACK) line(pt(.34f,.5f),pt(.9f,.5f)) }
+            IconKind.PREV, IconKind.BACK -> { line(pt(.34f,.18f),pt(.34f,.82f)); drawPath(poly(false,pt(.68f,.2f),pt(.32f,.5f),pt(.68f,.8f)),tint,style=st) }
             IconKind.NEXT -> { line(pt(.66f,.18f),pt(.66f,.82f)); drawPath(poly(false,pt(.32f,.2f),pt(.68f,.5f),pt(.32f,.8f)),tint,style=st) }
             IconKind.CHEVRON_DOWN -> drawPath(poly(false,pt(.25f,.38f),pt(.5f,.64f),pt(.75f,.38f)),tint,style=st)
             IconKind.CHEVRON_UP -> drawPath(poly(false,pt(.25f,.62f),pt(.5f,.36f),pt(.75f,.62f)),tint,style=st)
