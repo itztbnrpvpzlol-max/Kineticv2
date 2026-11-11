@@ -117,14 +117,15 @@ fun TimelinePane(editor: EditorState, modifier: Modifier = Modifier) {
     var graphSelection by remember { mutableStateOf<Pair<String, PropId>?>(null) }
     val leftPx = with(density) { LEFT_W.toPx() }
     val contentSec = max(editor.duration, editor.layers.maxOfOrNull { it.end } ?: 0f)
-    val contentW = (contentSec * pps).dp + 96.dp
+    // Half-viewport gutters allow time zero and the end to align with the fixed playhead.
+    val centerGutter = ((paneW - leftPx).coerceAtLeast(0f) / dens / 2f).dp
+    val contentW = centerGutter + (contentSec * pps).dp + centerGutter + 48.dp
 
-    // Keep the playhead at the center for playback, scrubbing, and zoom.
+    // Center the playhead under the preview transport's play control.
     LaunchedEffect(editor.time, pps, paneW) {
         if (paneW > leftPx) {
-            val viewW = paneW - leftPx
-            val target = (editor.time * pps * dens - viewW / 2f).coerceAtLeast(0f)
-            hScroll.scrollTo(target.toInt())
+            val target = centerGutter.value * dens + editor.time * pps * dens
+            hScroll.scrollTo(target.coerceAtLeast(0f).toInt())
         }
     }
 
@@ -149,7 +150,7 @@ fun TimelinePane(editor: EditorState, modifier: Modifier = Modifier) {
             Row(Modifier.fillMaxWidth().height(30.dp)) {
                 Spacer(Modifier.width(LEFT_W))
                 Box(Modifier.weight(1f).fillMaxHeight().horizontalScroll(hScroll)) {
-                    Ruler(editor, pps, contentW)
+                    Ruler(editor, pps, contentW, centerGutter)
                 }
             }
             LazyColumn(
@@ -170,7 +171,7 @@ fun TimelinePane(editor: EditorState, modifier: Modifier = Modifier) {
                 }
                 items(editor.layers, key = { it.id }) { layer ->
                     LayerRow(
-                        editor, layer, pps, hScroll, contentW,
+                        editor, layer, pps, hScroll, contentW, centerGutter,
                         expanded = layer.id in expandedLayers,
                         onToggleExpanded = { expandedLayers = if (layer.id in expandedLayers) expandedLayers - layer.id else expandedLayers + layer.id },
                         graphSelection = graphSelection,
@@ -197,7 +198,7 @@ fun TimelinePane(editor: EditorState, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun Ruler(editor: EditorState, pps: Float, contentW: Dp) {
+private fun Ruler(editor: EditorState, pps: Float, contentW: Dp, centerGutter: Dp) {
     val dens = LocalDensity.current.density
     val textPaint = remember {
         Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF8D8BA3.toInt() }
@@ -206,7 +207,7 @@ private fun Ruler(editor: EditorState, pps: Float, contentW: Dp) {
         Modifier
             .width(contentW)
             .fillMaxHeight()
-            .pointerInput(pps) { detectTapGestures { o -> editor.seekSnap(o.x / dens / pps, 8f / pps) } }
+            .pointerInput(pps, centerGutter) { detectTapGestures { o -> editor.seekSnap(((o.x / dens - centerGutter.value) / pps).coerceAtLeast(0f), 8f / pps) } }
             .pointerInput(pps) {
                 detectDragGestures { change, _ ->
                     change.consume()
@@ -218,10 +219,11 @@ private fun Ruler(editor: EditorState, pps: Float, contentW: Dp) {
         val step = if (pps >= 40f) 1 else if (pps >= 20f) 2 else 5
         val secs = (size.width / dens / pps).toInt() + 1
         val tick = Color(0xFF34344A)
-        val endX = editor.duration * pps * dens
+        val originX = centerGutter.toPx()
+        val endX = originX + editor.duration * pps * dens
         if (endX < size.width) drawRect(Color(0x55000000), Offset(endX, 0f), Size(size.width - endX, size.height))
         for (s in 0..secs) {
-            val x = s * pps * dens
+            val x = originX + s * pps * dens
             if (pps >= 80f) {
                 drawLine(tick, Offset(x + pps * dens / 2f, size.height - 5.dp.toPx()), Offset(x + pps * dens / 2f, size.height), 1.dp.toPx())
             }
@@ -236,7 +238,7 @@ private fun Ruler(editor: EditorState, pps: Float, contentW: Dp) {
 
 @Composable
 private fun LayerRow(
-    editor: EditorState, layer: Layer, pps: Float, hScroll: ScrollState, contentW: Dp,
+    editor: EditorState, layer: Layer, pps: Float, hScroll: ScrollState, contentW: Dp, centerGutter: Dp,
     expanded: Boolean, onToggleExpanded: () -> Unit,
     graphSelection: Pair<String, PropId>?, onGraphSelection: (PropId) -> Unit
 ) {
@@ -317,7 +319,7 @@ private fun LayerRow(
                 }
             }
             Box(Modifier.weight(1f).fillMaxHeight().horizontalScroll(hScroll)) {
-                Box(Modifier.width(contentW).fillMaxHeight()) { Clip(editor, layer, pps, selected) }
+                Box(Modifier.width(contentW).fillMaxHeight()) { Clip(editor, layer, pps, selected, centerGutter) }
             }
         }
         val parentName = layer.parentId?.let { id -> editor.layers.firstOrNull { it.id == id }?.name }
@@ -336,7 +338,7 @@ private fun LayerRow(
 }
 
 @Composable
-private fun Clip(editor: EditorState, layer: Layer, pps: Float, selected: Boolean) {
+private fun Clip(editor: EditorState, layer: Layer, pps: Float, selected: Boolean, centerGutter: Dp) {
     val ctx = LocalContext.current
     val dens = LocalDensity.current.density
     val shape = RoundedCornerShape(8.dp)
@@ -351,7 +353,7 @@ private fun Clip(editor: EditorState, layer: Layer, pps: Float, selected: Boolea
 
     Box(
         Modifier
-            .offset(x = (layer.start * pps).dp)
+            .offset(x = centerGutter + (layer.start * pps).dp)
             .width(max(layer.duration * pps, 6f).dp)
             .fillMaxHeight()
             .padding(vertical = 3.dp)
