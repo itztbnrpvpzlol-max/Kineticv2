@@ -40,7 +40,7 @@ import android.net.Uri
 
 private data class GpuLayer(
     val id: String,
-    val bitmap: Bitmap,
+    val bitmap: Bitmap?,
     val matrix: Matrix,
     val width: Float,
     val height: Float,
@@ -129,7 +129,7 @@ fun PreviewCanvas(editor: EditorState, modifier: Modifier = Modifier) {
         it.id == editor.selectedId && it.visible && it.activeAt(editor.time) && it.type != LayerType.AUDIO
     }?.let { layer ->
         GpuLayer(
-            layer.id, Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888),
+            layer.id, null,
             Matrix(layerMatrix(layer, editor.time, byId)), layer.width, layer.height, 1f,
             false, false, "Normal"
         )
@@ -167,7 +167,6 @@ private class GpuPreviewSurfaceView(context: Context) : GLSurfaceView(context) {
     }
 
     fun releaseRenderer() {
-        onPause()
         queueEvent { gpuRenderer.release() }
     }
 }
@@ -216,6 +215,9 @@ private class CompositionGlRenderer : GLSurfaceView.Renderer {
     override fun onDrawFrame(gl: GL10?) {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
         val current = scene
+        val activeTextureIds = current.layers.mapTo(HashSet()) { it.id }
+        val staleIds = textures.keys.filter { it !in activeTextureIds }
+        staleIds.forEach { id -> textures.remove(id)?.let { GLES20.glDeleteTextures(1, intArrayOf(it.id), 0) } }
         val scale = minOf(viewportWidth / COMP_W, viewportHeight / COMP_H)
         val offsetX = (viewportWidth - COMP_W * scale) / 2f
         val offsetY = (viewportHeight - COMP_H * scale) / 2f
@@ -224,8 +226,9 @@ private class CompositionGlRenderer : GLSurfaceView.Renderer {
     }
 
     private fun drawLayer(layer: GpuLayer, scale: Float, ox: Float, oy: Float) {
-        if (layer.bitmap.isRecycled || layer.opacity <= 0f) return
-        val texture = textureFor(layer) ?: return
+        val bitmap = layer.bitmap ?: return
+        if (bitmap.isRecycled || layer.opacity <= 0f) return
+        val texture = textureFor(layer.id, bitmap) ?: return
         val right = if (layer.mask) layer.width * 0.8f else layer.width
         val bottom = if (layer.mask) layer.height * 0.8f else layer.height
         val points = floatArrayOf(0f, 0f, 0f, bottom, right, 0f, right, bottom)
@@ -262,9 +265,9 @@ private class CompositionGlRenderer : GLSurfaceView.Renderer {
         GLES20.glDisableVertexAttribArray(uvHandle)
     }
 
-    private fun textureFor(layer: GpuLayer): Int? {
-        val old = textures[layer.id]
-        if (old != null && old.bitmap === layer.bitmap && old.id != 0) return old.id
+    private fun textureFor(layerId: String, bitmap: Bitmap): Int? {
+        val old = textures[layerId]
+        if (old != null && old.bitmap === bitmap && old.id != 0) return old.id
         if (old != null) GLES20.glDeleteTextures(1, intArrayOf(old.id), 0)
         val ids = IntArray(1)
         GLES20.glGenTextures(1, ids, 0)
@@ -274,8 +277,8 @@ private class CompositionGlRenderer : GLSurfaceView.Renderer {
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
-        GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, layer.bitmap, 0)
-        textures[layer.id] = TextureEntry(ids[0], layer.bitmap)
+        GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bitmap, 0)
+        textures[layerId] = TextureEntry(ids[0], bitmap)
         return ids[0]
     }
 
