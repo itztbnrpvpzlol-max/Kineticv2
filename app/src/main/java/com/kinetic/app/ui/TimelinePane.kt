@@ -119,14 +119,12 @@ fun TimelinePane(editor: EditorState, modifier: Modifier = Modifier) {
     val contentSec = max(editor.duration, editor.layers.maxOfOrNull { it.end } ?: 0f)
     val contentW = (contentSec * pps).dp + 96.dp
 
-    // Keep the playhead pinned to the visual center while playing.
-    LaunchedEffect(editor.playing, pps, paneW) {
-        if (editor.playing && paneW > leftPx) {
-            snapshotFlow { editor.time }.collect { t ->
-                val viewW = paneW - leftPx
-                val target = (t * pps * dens - viewW / 2f).coerceAtLeast(0f)
-                hScroll.scrollTo(target.toInt())
-            }
+    // Keep the playhead at the center for playback, scrubbing, and zoom.
+    LaunchedEffect(editor.time, pps, paneW) {
+        if (paneW > leftPx) {
+            val viewW = paneW - leftPx
+            val target = (editor.time * pps * dens - viewW / 2f).coerceAtLeast(0f)
+            hScroll.scrollTo(target.toInt())
         }
     }
 
