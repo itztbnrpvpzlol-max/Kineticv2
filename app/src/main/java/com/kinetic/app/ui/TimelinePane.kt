@@ -119,14 +119,13 @@ fun TimelinePane(editor: EditorState, modifier: Modifier = Modifier) {
     val contentSec = max(editor.duration, editor.layers.maxOfOrNull { it.end } ?: 0f)
     val contentW = (contentSec * pps).dp + 96.dp
 
-    // keep the playhead in view during playback
-    LaunchedEffect(editor.playing, pps) {
-        if (editor.playing) {
+    // Keep the playhead pinned to the visual center while playing.
+    LaunchedEffect(editor.playing, pps, paneW) {
+        if (editor.playing && paneW > leftPx) {
             snapshotFlow { editor.time }.collect { t ->
-                val x = t * pps * dens
                 val viewW = paneW - leftPx
-                if (x < hScroll.value) hScroll.scrollTo(max(0f, x - 24f * dens).toInt())
-                else if (x > hScroll.value + viewW - 24f * dens) hScroll.scrollTo((x - viewW + 64f * dens).toInt())
+                val target = (t * pps * dens - viewW / 2f).coerceAtLeast(0f)
+                hScroll.scrollTo(target.toInt())
             }
         }
     }
@@ -136,11 +135,14 @@ fun TimelinePane(editor: EditorState, modifier: Modifier = Modifier) {
             .fillMaxWidth()
             .onSizeChanged { paneW = it.width }
             .pointerInput(Unit) { detectPinch { z -> pps = (pps * z).coerceIn(18f, 400f) } }
-            .pointerInput(pps) {
+            .pointerInput(pps, paneW) {
                 detectDragGestures { change, drag ->
                     if (change.position.x > leftPx) {
                         change.consume()
-                        editor.seek((editor.time - drag.x / dens / pps).coerceAtLeast(0f))
+                        hScroll.dispatchRawDelta(-drag.x)
+                        val viewW = (paneW - leftPx).coerceAtLeast(1f)
+                        val centeredTime = (hScroll.value / dens + viewW / dens / 2f) / pps
+                        editor.seek(centeredTime.coerceAtLeast(0f))
                     }
                 }
             }
@@ -181,7 +183,7 @@ fun TimelinePane(editor: EditorState, modifier: Modifier = Modifier) {
         }
         // playhead
         Canvas(Modifier.fillMaxSize()) {
-            val x = leftPx + editor.time * pps * dens - hScroll.value
+            val x = leftPx + (paneW - leftPx) / 2f
             if (x >= leftPx - 1f && x <= size.width) {
                 drawLine(Color.White, Offset(x, 14.dp.toPx()), Offset(x, size.height), 2.dp.toPx())
                 val tri = Path().apply {

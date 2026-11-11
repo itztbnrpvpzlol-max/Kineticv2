@@ -102,6 +102,8 @@ fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> 
     val audio = remember { AudioEngine(ctx) }
     DisposableEffect(Unit) { onDispose { audio.release(); MediaLoader.releaseAll() } }
     val projectStore = remember { ProjectStore(ctx) }
+    LaunchedEffect(editor.settings.previewMemoryMb) { MediaLoader.configureCache(editor.settings.previewMemoryMb) }
+
     LaunchedEffect(editor.layers, editor.duration, editor.resolution, editor.projectName) {
         delay(400)
         withContext(Dispatchers.IO) { runCatching { projectStore.save(editor) } }

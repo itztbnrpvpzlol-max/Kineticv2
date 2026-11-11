@@ -1,5 +1,6 @@
 package com.kinetic.app.ui
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -26,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
@@ -122,6 +124,10 @@ private fun PropertySlider(editor: EditorState, layer: Layer, id: PropId, value:
     }
     Column(Modifier.width(116.dp).padding(horizontal = 3.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Text(id.format(value), color = KColors.Accent, fontSize = 10.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, maxLines = 1)
+        Canvas(Modifier.fillMaxWidth().height(7.dp)) {
+            val gap = size.width / 24f
+            for (i in 0..24) drawLine(KColors.Muted.copy(alpha = if (i % 4 == 0) 0.9f else 0.45f), Offset(i * gap, 1f), Offset(i * gap, if (i % 4 == 0) 7f else 5f), 1.dp.toPx())
+        }
         Slider(value = value.coerceIn(range), onValueChange = { editor.setPropValue(layer.id, id, it) }, valueRange = range)
     }
 }
