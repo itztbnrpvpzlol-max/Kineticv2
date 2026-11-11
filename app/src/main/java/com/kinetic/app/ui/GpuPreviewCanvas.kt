@@ -13,7 +13,6 @@ import android.opengl.GLSurfaceView
 import android.opengl.GLUtils
 import android.os.Handler
 import android.os.Looper
-import android.view.View
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -21,14 +20,12 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import com.kinetic.app.data.MediaLoader
 import com.kinetic.app.model.COMP_H
 import com.kinetic.app.model.COMP_W
 import com.kinetic.app.model.EditorState
-import com.kinetic.app.model.Layer
 import com.kinetic.app.model.LayerType
 import com.kinetic.app.model.PropId
 import com.kinetic.app.model.layerMatrix
@@ -67,6 +64,11 @@ fun PreviewCanvas(editor: EditorState, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val frames = remember { mutableStateMapOf<String, Bitmap>() }
     val textTextures = remember { mutableMapOf<String, Pair<Int, Bitmap>>() }
+    LaunchedEffect(editor.layers.map { it.id }) {
+        val currentIds = editor.layers.mapTo(HashSet<String>()) { it.id }
+        val stale = textTextures.keys.filter { it !in currentIds }
+        stale.forEach { id -> textTextures.remove(id)?.second?.let { if (!it.isRecycled) it.recycle() } }
+    }
 
     for (layer in editor.layers) {
         val uri = layer.uri
@@ -228,7 +230,7 @@ private class CompositionGlRenderer(private val onGpuFailure: () -> Unit) : GLSu
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
         if (program == 0) return
         val current = scene
-        val activeTextureIds = current.layers.mapTo(HashSet()) { it.id }
+        val activeTextureIds = current.layers.mapTo(HashSet<String>()) { it.id }
         val staleIds = textures.keys.filter { it !in activeTextureIds }
         staleIds.forEach { id -> textures.remove(id)?.let { GLES20.glDeleteTextures(1, intArrayOf(it.id), 0) } }
         val scale = minOf(viewportWidth / COMP_W, viewportHeight / COMP_H)
