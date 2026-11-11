@@ -98,6 +98,11 @@ fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> 
     var dockTool by remember { mutableStateOf("Select") }
     var showToolSheet by remember { mutableStateOf(false) }
 
+    LaunchedEffect(editor.selectedId) {
+        dockTool = if (editor.selectedId == null) "Select" else "Properties"
+        showToolSheet = false
+    }
+
     fun leave() { if (editor.layers.isEmpty()) onExit() else showLeave = true }
     BackHandler { leave() }
     BackHandler(enabled = previewExpanded) { previewExpanded = false }
@@ -196,7 +201,7 @@ fun EditorScreen(editor: EditorState, onExit: () -> Unit, onOpenSettings: () -> 
                     onRename = { renameTarget = activeLayer }, onParent = { parentPicker = true },
                     modifier = Modifier.fillMaxWidth().height(panelHeight.dp))
             }
-            UnifiedEditingDock(dockTool) { tool ->
+            FloatingEditingDock(dockTool, activeLayer != null) { tool ->
                 dockTool = tool
                 when (tool) {
                     "Select" -> editor.select(null)
@@ -336,17 +341,61 @@ private fun TopBar(editor: EditorState, onMenuHome: () -> Unit, onOpenSettings: 
 
 
 @Composable
-private fun UnifiedEditingDock(active: String, onSelect: (String) -> Unit) {
-    val tools = listOf("Select" to IconKind.SELECT, "Properties" to IconKind.SLIDERS, "Speed" to IconKind.STOPWATCH, "Volume" to IconKind.VOLUME, "Extract audio" to IconKind.WAVEFORM, "Masking" to IconKind.MASK, "Effects" to IconKind.EFFECTS, "Blending" to IconKind.BLEND, "Blend modes" to IconKind.GRID, "Graph" to IconKind.GRID, "Text" to IconKind.TEXT, "Shapes" to IconKind.SHAPES, "Layers" to IconKind.LAYERS, "Adjust" to IconKind.ADJ)
-    Row(Modifier.fillMaxWidth().height(66.dp).background(KColors.Surface).horizontalScroll(rememberScrollState()).padding(horizontal = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+private fun FloatingEditingDock(active: String, hasSelection: Boolean, onSelect: (String) -> Unit) {
+    // Keep the original floating capsule. Only its available actions change with selection.
+    val tools = if (hasSelection) {
+        listOf(
+            "Properties" to IconKind.SLIDERS,
+            "Speed" to IconKind.STOPWATCH,
+            "Volume" to IconKind.VOLUME,
+            "Extract audio" to IconKind.WAVEFORM,
+            "Masking" to IconKind.MASK,
+            "Effects" to IconKind.EFFECTS,
+            "Blending" to IconKind.BLEND,
+            "Blend modes" to IconKind.GRID,
+            "Graph" to IconKind.GRID
+        )
+    } else {
+        listOf(
+            "Select" to IconKind.SELECT,
+            "Text" to IconKind.TEXT,
+            "Shapes" to IconKind.SHAPES,
+            "Layers" to IconKind.LAYERS,
+            "Adjust" to IconKind.ADJ
+        )
+    }
+    val shape = RoundedCornerShape(30.dp)
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp)
+            .clip(shape).background(KColors.Surface)
+            .border(1.dp, KColors.Line, shape)
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 6.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         tools.forEach { (label, icon) ->
-            Column(Modifier.width(66.dp).fillMaxHeight().clip(RoundedCornerShape(8.dp)).clickable { onSelect(label) }.padding(vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            Column(
+                Modifier.width(if (hasSelection) 68.dp else 62.dp)
+                    .height(48.dp).clip(RoundedCornerShape(10.dp))
+                    .clickable { onSelect(label) }.padding(vertical = 3.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
                 KIcon(icon, if (active == label) KColors.Accent else KColors.Muted, Modifier.size(20.dp))
-                Text(label, color = if (active == label) KColors.Accent else KColors.Muted, fontSize = 8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(label, color = if (active == label) KColors.Accent else KColors.Muted,
+                    fontSize = 8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
-        Column(Modifier.width(58.dp).fillMaxHeight().clickable { onSelect("Import") }, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-            Box(Modifier.size(36.dp).clip(CircleShape).background(KColors.Fab), contentAlignment = Alignment.Center) { KIcon(IconKind.PLUS, KColors.Text, Modifier.size(24.dp)) }
+        Box(Modifier.width(1.dp).height(34.dp).background(KColors.Line))
+        Column(
+            Modifier.padding(start = 8.dp, end = 2.dp).width(50.dp).height(48.dp)
+                .clip(CircleShape).clickable { onSelect("Import") },
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Box(Modifier.size(34.dp).clip(CircleShape).background(KColors.Fab), contentAlignment = Alignment.Center) {
+                KIcon(IconKind.PLUS, KColors.Text, Modifier.size(22.dp))
+            }
             Text("Import", color = KColors.Muted, fontSize = 8.sp)
         }
     }
