@@ -13,6 +13,7 @@ import android.net.Uri
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
@@ -47,9 +48,14 @@ fun PreviewCanvas(editor: EditorState, modifier: Modifier = Modifier) {
             // share the same bucket size so toggling transport doesn't invalidate cache.
             val bucket = if (!active) -1 else if (l.type == LayerType.VIDEO) (src * 12f).toInt() else 0
             key(l.id) {
+                DisposableEffect(l.id) {
+                    onDispose { bitmaps.remove(l.id) }
+                }
                 LaunchedEffect(uri, bucket) {
                     if (bucket >= 0) {
                         MediaLoader.bitmapFor(ctx, Uri.parse(uri), l.type, src, 12, 640)?.let { bitmaps[l.id] = it }
+                    } else {
+                        bitmaps.remove(l.id)
                     }
                 }
             }
