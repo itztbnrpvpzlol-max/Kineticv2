@@ -72,7 +72,12 @@ fun MediaImportSheet(
     var hasPermission by remember { mutableStateOf(false) }
 
     val permissions = remember {
-        if (Build.VERSION.SDK_INT >= 33) arrayOf(
+        if (Build.VERSION.SDK_INT >= 34) arrayOf(
+            Manifest.permission.READ_MEDIA_IMAGES,
+            Manifest.permission.READ_MEDIA_VIDEO,
+            Manifest.permission.READ_MEDIA_AUDIO,
+            Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED
+        ) else if (Build.VERSION.SDK_INT >= 33) arrayOf(
             Manifest.permission.READ_MEDIA_IMAGES,
             Manifest.permission.READ_MEDIA_VIDEO,
             Manifest.permission.READ_MEDIA_AUDIO
@@ -83,7 +88,8 @@ fun MediaImportSheet(
     }
     LaunchedEffect(tab) {
         val required = if (Build.VERSION.SDK_INT >= 33) {
-            if (tab == 0) arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO)
+            if (tab == 0 && Build.VERSION.SDK_INT >= 34) arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO, Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED)
+            else if (tab == 0) arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO)
             else arrayOf(Manifest.permission.READ_MEDIA_AUDIO)
         } else arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
         hasPermission = required.any { ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED }
