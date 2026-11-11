@@ -101,10 +101,11 @@ class EditorState(val settings: AppSettings, val projectId: String = UUID.random
         if (seekTo != null) time = seekTo.coerceIn(0f, duration)
     }
 
-    fun seek(t: Float) { time = t.coerceAtLeast(0f) }
+    fun seek(t: Float) { val target = t.coerceAtLeast(0f); if (target > duration) baseDuration = target; time = target }
 
     fun seekSnap(t: Float, windowSec: Float) {
         val raw = t.coerceAtLeast(0f)
+        if (raw > duration) baseDuration = raw
         if (settings.snap) {
             val times = selected?.props?.values?.flatMap { p -> p.keys.map { it.t } } ?: emptyList()
             val near = times.minByOrNull { abs(it - raw) }
