@@ -140,7 +140,11 @@ data class Layer(
     val color: Int = 0xFF8D8BA3.toInt(),
     val props: Map<PropId, Prop>,
     /** Reserved for later: adjustment layers will hold effects here. Intentionally empty for now. */
-    val effects: List<String> = emptyList()
+    val effects: List<String> = emptyList(),
+    val speed: Float = 1f,
+    val volume: Float = 1f,
+    val maskEnabled: Boolean = false,
+    val blendMode: String = "Normal"
 ) {
     val end: Float get() = start + duration
     fun p(id: PropId): Prop = props.getValue(id)

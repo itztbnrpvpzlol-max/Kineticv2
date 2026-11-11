@@ -148,6 +148,14 @@ class EditorState(val settings: AppSettings, val projectId: String = UUID.random
         addLayer(newLayer(type, name, time, dur, lw, lh, uri, src))
     }
 
+    fun extractAudio(id: String) {
+        val source = layers.firstOrNull { it.id == id } ?: return
+        if (source.type != LayerType.VIDEO || source.uri == null) return
+        val audio = newLayer(LayerType.AUDIO, nextName("Extracted Audio"), source.start,
+            source.duration, 0f, 0f, source.uri, source.srcLength).copy(srcOffset = source.srcOffset)
+        addLayer(audio)
+    }
+
     fun deleteLayer(id: String) {
         commit { ls -> ls.filter { it.id != id }.map { if (it.parentId == id) it.copy(parentId = null) else it } }
         fixSelection()

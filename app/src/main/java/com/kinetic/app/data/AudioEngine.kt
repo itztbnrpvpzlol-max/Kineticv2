@@ -46,6 +46,8 @@ class AudioEngine(context: Context) {
                 continue
             }
 
+            player.setPlaybackSpeed(layer.speed.coerceIn(0.1f, 4f))
+            player.volume = if (layer.type == LayerType.AUDIO) layer.volume.coerceIn(0f, 2f) else 1f
             val targetMs = sourcePositionMs(layer, time)
             if (!player.playWhenReady) {
                 // Resume without an unconditional seek. ExoPlayer retains its decoder
@@ -79,7 +81,7 @@ class AudioEngine(context: Context) {
     }
 
     private fun sourcePositionMs(layer: Layer, time: Float): Long =
-        (((time - layer.start + layer.srcOffset).coerceAtLeast(0f)) * 1000f).toLong()
+        (((time - layer.start).coerceAtLeast(0f) * layer.speed + layer.srcOffset).coerceAtLeast(0f) * 1000f).toLong()
 
     fun pauseAll() {
         for (player in players.values) {

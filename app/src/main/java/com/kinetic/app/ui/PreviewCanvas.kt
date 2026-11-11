@@ -2,6 +2,10 @@ package com.kinetic.app.ui
 
 import android.graphics.Bitmap
 import android.graphics.DashPathEffect
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
@@ -38,7 +42,7 @@ fun PreviewCanvas(editor: EditorState, modifier: Modifier = Modifier) {
         val uri = l.uri
         if (uri != null && (l.type == LayerType.IMAGE || l.type == LayerType.VIDEO)) {
             val active = l.activeAt(t)
-            val src = (t - l.start + l.srcOffset).coerceAtLeast(0f)
+            val src = ((t - l.start).coerceAtLeast(0f) * l.speed + l.srcOffset).coerceAtLeast(0f)
             // Decode video preview frames at a bounded rate. Scrubbing and playback
             // share the same bucket size so toggling transport doesn't invalidate cache.
             val bucket = if (!active) -1 else if (l.type == LayerType.VIDEO) (src * 6f).toInt() else 0
@@ -84,6 +88,14 @@ fun PreviewCanvas(editor: EditorState, modifier: Modifier = Modifier) {
                 val alpha = (l.p(PropId.OPACITY).valueAt(time) * 2.55f).toInt().coerceIn(0, 255)
                 nc.save()
                 nc.concat(layerMatrix(l, time, byId))
+                if (l.maskEnabled) nc.clipRect(0f, 0f, l.width * 0.8f, l.height * 0.8f)
+                paint.xfermode = when (l.blendMode) {
+                    "Multiply" -> PorterDuffXfermode(PorterDuff.Mode.MULTIPLY)
+                    "Screen" -> PorterDuffXfermode(PorterDuff.Mode.SCREEN)
+                    "Add" -> PorterDuffXfermode(PorterDuff.Mode.ADD)
+                    else -> null
+                }
+                paint.colorFilter = if ("Grayscale" in l.effects) ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(0f) }) else null
                 when (l.type) {
                     LayerType.IMAGE, LayerType.VIDEO -> {
                         val bmp = bitmaps[l.id]
@@ -105,6 +117,8 @@ fun PreviewCanvas(editor: EditorState, modifier: Modifier = Modifier) {
                     }
                     else -> Unit
                 }
+                paint.xfermode = null
+                paint.colorFilter = null
                 nc.restore()
             }
             nc.restore()
