@@ -460,15 +460,17 @@ private fun PropertyTimelineRow(
         Row(Modifier.width(LEFT_W).fillMaxHeight().padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(id.label, color = if (editor.selectedProp == id) KColors.Text else KColors.Muted, fontSize = 10.sp, modifier = Modifier.weight(1f).clickable { editor.selectProp(id) }, maxLines = 1)
             Box(
-                Modifier.width(62.dp).height(28.dp)
-                    .pointerInput(layer.id, id) {
+                Modifier.width(68.dp).height(28.dp).then(
+                    if (editor.settings.afterEffectsScrubbing) Modifier.pointerInput(layer.id, id) {
                         detectHorizontalDragGestures(onDragStart = { editor.beginEdit() }) { change, dx ->
                             change.consume()
                             val current = editor.layers.firstOrNull { it.id == layer.id }?.p(id)?.valueAt(editor.time) ?: prop.valueAt(editor.time)
                             editor.setPropValue(layer.id, id, current + dx / dens * id.scrubStep * editor.settings.scrubMultiplier)
                         }
-                    }, contentAlignment = Alignment.Center
-            ) { Text(id.format(prop.valueAt(editor.time)), color = KColors.Accent, fontSize = 9.sp, maxLines = 1) }
+                    } else Modifier
+                ).clickable(enabled = !editor.settings.afterEffectsScrubbing) { editor.selectProp(id) },
+                contentAlignment = Alignment.Center
+            ) { Text(id.format(prop.valueAt(editor.time)), color = KColors.Accent, fontSize = 10.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, maxLines = 1) }
             Box(Modifier.size(24.dp).clickable { editor.toggleStopwatch(layer.id, id) }, contentAlignment = Alignment.Center) {
                 KIcon(IconKind.STOPWATCH, if (prop.animated) KColors.Accent else KColors.Dim, Modifier.size(14.dp))
             }

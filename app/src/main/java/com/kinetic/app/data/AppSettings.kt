@@ -35,6 +35,8 @@ class AppSettings(context: Context) {
         private set
     var loop by mutableStateOf(prefs.getBoolean("loop", false))
         private set
+    var afterEffectsScrubbing by mutableStateOf(prefs.getBoolean("afterEffectsScrubbing", true))
+        private set
 
     fun updateResolution(i: Int) { resolution = i; prefs.edit().putInt("resolution", i).apply() }
     fun updateFrameRate(i: Int) { frameRate = i; prefs.edit().putInt("frameRate", i).apply() }
@@ -43,6 +45,7 @@ class AppSettings(context: Context) {
     fun updateSensitivity(i: Int) { sensitivity = i; prefs.edit().putInt("sensitivity", i).apply() }
     fun updateSnap(v: Boolean) { snap = v; prefs.edit().putBoolean("snap", v).apply() }
     fun updateLoop(v: Boolean) { loop = v; prefs.edit().putBoolean("loop", v).apply() }
+    fun updateAfterEffectsScrubbing(v: Boolean) { afterEffectsScrubbing = v; prefs.edit().putBoolean("afterEffectsScrubbing", v).apply() }
 
     val fps: Int get() = FPS[frameRate]
     val compSeconds: Int get() = COMP_LENGTHS[compLength]

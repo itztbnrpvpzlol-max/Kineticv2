@@ -207,6 +207,31 @@ class EditorState(val settings: AppSettings, val projectId: String = UUID.random
         l.copy(start = l.start + d, duration = l.duration - d, srcOffset = l.srcOffset + d)
     }
 
+    fun moveLayerStartToPlayhead(id: String) {
+        val l = layers.firstOrNull { it.id == id } ?: return
+        val target = time.coerceIn(0f, duration)
+        if (target >= l.end - frame) return
+        val delta = target - l.start
+        val maxSource = if (l.srcLength.isFinite()) (l.srcLength - l.srcOffset).coerceAtLeast(frame) else Float.POSITIVE_INFINITY
+        val nextDuration = minOf(l.duration - delta, maxSource).coerceAtLeast(frame)
+        updateLayer(id) { it.copy(start = target, duration = nextDuration, srcOffset = (it.srcOffset + delta).coerceAtLeast(0f)) }
+    }
+
+    fun moveLayerEndToPlayhead(id: String) {
+        val l = layers.firstOrNull { it.id == id } ?: return
+        val target = time.coerceAtLeast(l.start + frame).coerceAtMost(duration)
+        val requested = target - l.start
+        val maxDuration = if (l.srcLength.isFinite()) (l.srcLength - l.srcOffset).coerceAtLeast(frame) else duration - l.start
+        updateLayer(id) { it.copy(duration = requested.coerceIn(frame, maxDuration)) }
+    }
+
+    fun extendLayerToPlayhead(id: String) {
+        val l = layers.firstOrNull { it.id == id } ?: return
+        if (time <= l.end) return
+        val maxDuration = if (l.srcLength.isFinite()) (l.srcLength - l.srcOffset).coerceAtLeast(l.duration) else duration - l.start
+        updateLayer(id) { it.copy(duration = (time - it.start).coerceIn(it.duration, maxDuration)) }
+    }
+
     /** Parenting keeps the child where it is on screen (position only, if position isn't keyframed). */
     fun setParent(childId: String, parentId: String?) {
         val byId = layers.associateBy { it.id }
