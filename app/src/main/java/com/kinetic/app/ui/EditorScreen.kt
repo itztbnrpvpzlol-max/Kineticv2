@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -309,22 +311,22 @@ private fun AlightCutBar(editor: EditorState, layer: Layer) {
     val inside = editor.time > layer.start + editor.frame && editor.time < layer.end - editor.frame
     Row(Modifier.fillMaxWidth().height(42.dp).padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
         if (inside) {
-            CutAction("Split", IconKind.SPLIT) { editor.splitSelected() }
-            CutAction("Trim start", IconKind.CUT) { editor.trimLeft(layer.id, editor.time - layer.start) }
-            CutAction("Trim end", IconKind.CUT) { editor.moveLayerEndToPlayhead(layer.id) }
+            CutAction("Split", IconKind.SPLIT, Modifier.weight(1f)) { editor.splitSelected() }
+            CutAction("Trim start", IconKind.CUT, Modifier.weight(1f)) { editor.trimLeft(layer.id, editor.time - layer.start) }
+            CutAction("Trim end", IconKind.CUT, Modifier.weight(1f)) { editor.moveLayerEndToPlayhead(layer.id) }
         } else if (editor.time < layer.start) {
-            CutAction("Move to playhead", IconKind.PREV) { editor.moveLayerStartToPlayhead(layer.id) }
+            CutAction("Move to playhead", IconKind.PREV, Modifier.weight(1f)) { editor.moveLayerStartToPlayhead(layer.id) }
         } else {
-            CutAction("Extend to playhead", IconKind.NEXT) { editor.extendLayerToPlayhead(layer.id) }
+            CutAction("Extend to playhead", IconKind.NEXT, Modifier.weight(1f)) { editor.extendLayerToPlayhead(layer.id) }
         }
-        CutAction("Duplicate", IconKind.COPY) { editor.duplicate(layer.id) }
-        CutAction("Delete", IconKind.DELETE) { editor.deleteLayer(layer.id) }
+        CutAction("Duplicate", IconKind.COPY, Modifier.weight(1f)) { editor.duplicate(layer.id) }
+        CutAction("Delete", IconKind.DELETE, Modifier.weight(1f)) { editor.deleteLayer(layer.id) }
     }
 }
 
 @Composable
-private fun CutAction(label: String, icon: IconKind, onClick: () -> Unit) {
-    Row(Modifier.weight(1f).height(34.dp).clip(RoundedCornerShape(8.dp)).background(KColors.Surface2).clickable(onClick = onClick).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+private fun CutAction(label: String, icon: IconKind, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Row(modifier.height(34.dp).clip(RoundedCornerShape(8.dp)).background(KColors.Surface2).clickable(onClick = onClick).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
         KIcon(icon, KColors.Text, Modifier.size(15.dp))
         Spacer(Modifier.width(3.dp))
         Text(label, color = KColors.Text, fontSize = 9.sp, maxLines = 1)
@@ -339,9 +341,9 @@ private fun AlightDock(active: String, onSelect: (String) -> Unit) {
         "Masking" to IconKind.MASK, "Effects" to IconKind.EFFECTS,
         "Blending & opacity" to IconKind.BLEND, "Blend modes" to IconKind.GRID
     )
-    Row(Modifier.fillMaxWidth().height(64.dp).background(KColors.Surface).padding(horizontal = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().height(64.dp).background(KColors.Surface).horizontalScroll(rememberScrollState()).padding(horizontal = 3.dp), verticalAlignment = Alignment.CenterVertically) {
         tools.forEach { (label, icon) ->
-            Column(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(7.dp)).clickable { onSelect(label) }.padding(vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            Column(Modifier.width(72.dp).fillMaxHeight().clip(RoundedCornerShape(7.dp)).clickable { onSelect(label) }.padding(vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                 KIcon(icon, if (active == label) KColors.Accent else KColors.Muted, Modifier.size(19.dp))
                 Text(label, color = if (active == label) KColors.Accent else KColors.Muted, fontSize = 7.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
