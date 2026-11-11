@@ -33,7 +33,7 @@ import com.kinetic.app.model.layerMatrix
 import android.graphics.Path as AndroidPath
 
 @Composable
-fun PreviewCanvas(editor: EditorState, modifier: Modifier = Modifier) {
+fun CpuPreviewCanvas(editor: EditorState, modifier: Modifier = Modifier) {
     val ctx = LocalContext.current
     val bitmaps = remember { mutableStateMapOf<String, Bitmap>() }
 
