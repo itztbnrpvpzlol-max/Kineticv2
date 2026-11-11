@@ -45,3 +45,12 @@ Kinetic is a mobile-first motion design workspace. The editor prioritizes the co
 - Audio does not restart or seek continuously during steady playback.
 - Playback frame pacing and audio underruns are measured on physical devices.
 - No performance improvement is claimed without before/after measurements.
+
+
+## Typography and icon direction
+
+- Use a platform-native sans-serif family with a deliberate type ramp, compact metadata labels, and tabular numeric treatment for timecode where supported.
+- Do not bundle Apple's San Francisco font: it is proprietary and not licensed for arbitrary redistribution. The current Android theme uses the native sans-serif family as a clean, readable baseline.
+- Final direction is an iOS-quality feel: calm hierarchy, restrained tracking, consistent weights, and legible small labels.
+- UI iconography should be a cohesive editable vector set designed in the Kinetic Figma file, with a consistent 24 dp grid, 2 dp optical stroke, rounded caps/joins, and clear filled/outline states.
+- Figma's connected Starter plan currently blocks further MCP calls due its tool-call rate limit. The Figma-authored icon library and its export/import into Android resources remain pending; do not represent the current hand-drawn Canvas glyphs as Figma exports.
