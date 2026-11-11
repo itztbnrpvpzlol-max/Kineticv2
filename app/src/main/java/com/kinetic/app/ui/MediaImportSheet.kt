@@ -40,6 +40,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.common.MediaItem
+import androidx.media3.ui.PlayerView
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -63,6 +68,19 @@ fun MediaImportSheet(
     onImport: (ImportMediaEntry, Float, Float) -> Unit
 ) {
     val context = LocalContext.current
+    val previewPlayer = remember { ExoPlayer.Builder(context).build() }
+    DisposableEffect(previewPlayer) { onDispose { previewPlayer.release() } }
+    LaunchedEffect(selected?.uri) {
+        previewPlayer.stop()
+        val item = selected
+        if (item != null && item.type != LayerType.IMAGE) {
+            previewPlayer.setMediaItem(MediaItem.fromUri(item.uri))
+            previewPlayer.prepare()
+        }
+    }
+    LaunchedEffect(selected?.uri, previewAt) {
+        if (selected?.type == LayerType.VIDEO) previewPlayer.seekTo((previewAt * 1000f).toLong())
+    }
     var tab by remember { mutableStateOf(0) }
     var entries by remember { mutableStateOf<List<ImportMediaEntry>>(emptyList()) }
     var selected by remember { mutableStateOf<ImportMediaEntry?>(null) }
@@ -164,8 +182,15 @@ fun MediaImportSheet(
         } else {
             Row(Modifier.fillMaxWidth().height(180.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Box(Modifier.weight(1f).fillMaxSize().clip(RoundedCornerShape(10.dp)).background(KColors.Bg), contentAlignment = Alignment.Center) {
-                    if (preview != null) Image(preview!!.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-                    else Text(if (selected?.type == LayerType.AUDIO) "Audio selected" else "Select media", color = KColors.Muted, fontSize = 12.sp)
+                    when (selected?.type) {
+                        LayerType.IMAGE -> if (preview != null) Image(preview!!.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                        LayerType.VIDEO, LayerType.AUDIO -> AndroidView(
+                            factory = { viewContext -> PlayerView(viewContext).apply { player = previewPlayer; useController = true } },
+                            update = { it.player = previewPlayer },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        else -> Text("Select media", color = KColors.Muted, fontSize = 12.sp)
+                    }
                 }
                 Column(Modifier.weight(1f).fillMaxSize()) {
                     Text(selected?.name ?: "No selection", color = KColors.Text, fontSize = 12.sp, maxLines = 2)
