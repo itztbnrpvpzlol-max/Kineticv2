@@ -57,7 +57,7 @@ class AudioEngine(context: Context) {
             }
 
             player.setPlaybackSpeed(layer.speed.coerceIn(0.1f, 4f))
-            player.volume = if (layer.type == LayerType.AUDIO) layer.volume.coerceIn(0f, 2f) else 1f
+            player.volume = layer.volume.coerceIn(0f, 2f)
             val targetMs = sourcePositionMs(layer, time)
             if (!player.playWhenReady) {
                 // Resume without an unconditional seek. ExoPlayer retains its decoder

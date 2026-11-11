@@ -10,6 +10,7 @@ import android.util.LruCache
 import com.kinetic.app.model.LayerType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.util.concurrent.ConcurrentHashMap
 
 object MediaLoader {
     class Info(val length: Float?, val width: Int, val height: Int)
@@ -17,14 +18,17 @@ object MediaLoader {
     private val cache = object : LruCache<String, Bitmap>(128 * 1024 * 1024) {
         override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount
     }
-    private val retrievers = HashMap<String, MediaMetadataRetriever>()
+    private val retrievers = ConcurrentHashMap<String, MediaMetadataRetriever>()
+    private val retrieverLocks = ConcurrentHashMap<String, Any>()
 
     fun configureCache(memoryMb: Int) { cache.resize(memoryMb.coerceIn(32, 512) * 1024 * 1024) }
 
-    @Synchronized
     fun releaseAll() {
-        retrievers.values.forEach { runCatching { it.release() } }
+        retrievers.forEach { (key, retriever) ->
+            synchronized(retrieverLocks.getOrPut(key) { Any() }) { runCatching { retriever.release() } }
+        }
         retrievers.clear()
+        retrieverLocks.clear()
     }
 
     fun displayName(ctx: Context, uri: Uri): String {
@@ -88,16 +92,20 @@ object MediaLoader {
         return ctx.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, o) }
     }
 
-    @Synchronized
     private fun videoFrame(ctx: Context, uri: Uri, sec: Float, maxEdge: Int): Bitmap? {
-        val r = retrievers.getOrPut(uri.toString()) {
-            MediaMetadataRetriever().apply { setDataSource(ctx, uri) }
+        val key = uri.toString()
+        val lock = retrieverLocks.computeIfAbsent(key) { Any() }
+        return synchronized(lock) {
+            val r = retrievers.computeIfAbsent(key) {
+                MediaMetadataRetriever().apply { setDataSource(ctx, uri) }
+            }
+            val f = r.getFrameAtTime((sec * 1_000_000f).toLong(), MediaMetadataRetriever.OPTION_CLOSEST)
+                ?: return@synchronized null
+            val m = maxOf(f.width, f.height)
+            if (m <= maxEdge) f else {
+                val scale = maxEdge.toFloat() / m
+                Bitmap.createScaledBitmap(f, (f.width * scale).toInt(), (f.height * scale).toInt(), true)
+            }
         }
-        val f = r.getFrameAtTime((sec * 1_000_000f).toLong(), MediaMetadataRetriever.OPTION_CLOSEST)
-            ?: return null
-        val m = maxOf(f.width, f.height)
-        if (m <= maxEdge) return f
-        val s = maxEdge.toFloat() / m
-        return Bitmap.createScaledBitmap(f, (f.width * s).toInt(), (f.height * s).toInt(), true)
     }
 }
