@@ -81,9 +81,13 @@ fun MediaImportSheet(
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
         hasPermission = result.values.any { it }
     }
-    LaunchedEffect(Unit) {
-        hasPermission = permissions.any { ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED }
-        if (!hasPermission) permissionLauncher.launch(permissions)
+    LaunchedEffect(tab) {
+        val required = if (Build.VERSION.SDK_INT >= 33) {
+            if (tab == 0) arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO)
+            else arrayOf(Manifest.permission.READ_MEDIA_AUDIO)
+        } else arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+        hasPermission = required.any { ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED }
+        if (!hasPermission) permissionLauncher.launch(required)
     }
 
     LaunchedEffect(tab, hasPermission) {
